@@ -65,8 +65,8 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
           </button>
           
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/15 shrink-0 bg-black/40">
-              <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+              <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block leading-tight">
@@ -114,8 +114,8 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
             {/* Drawer Header */}
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/20 shrink-0">
-                  <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                <div className="w-10 h-10 shrink-0 flex items-center justify-center">
+                  <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h3 className="font-serif font-bold text-white text-sm">
@@ -207,8 +207,8 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
           
           {/* Sidebar Header: Studio Info */}
           <div className="p-5 border-b border-white/10 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl overflow-hidden border border-white/20 shadow-md shrink-0 bg-black/40">
-              <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+              <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
