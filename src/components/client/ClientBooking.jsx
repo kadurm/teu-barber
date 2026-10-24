@@ -32,12 +32,28 @@ import {
   ExternalLink
 } from 'lucide-react';
 import MercadoPagoCheckout from './MercadoPagoCheckout';
+import ClientProfileModal from './ClientProfileModal';
 
 export default function ClientBooking() {
-  const { shopInfo, barbers, services, addAppointment, isSlotAvailable, updateAppointmentStatus } = useApp();
+  const {
+    shopInfo,
+    barbers,
+    services,
+    addAppointment,
+    isSlotAvailable,
+    updateAppointmentStatus,
+    clients,
+    currentClientPhone,
+    getClientByPhone,
+    logoutClient
+  } = useApp();
 
   // Current wizard step: 1: Barber, 2: Service, 3: DateTime, 4: Client Info, 5: Confirmation
   const [step, setStep] = useState(1);
+
+  // Client Profile modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [autoRecognizedClient, setAutoRecognizedClient] = useState(null);
 
   // Booking selections
   const [selectedBarberId, setSelectedBarberId] = useState('user1'); // Default to Teu
@@ -111,11 +127,42 @@ export default function ClientBooking() {
     });
   }, [shopInfo, selectedDate, selectedBarberId, selectedService, isSlotAvailable]);
 
-  // Phone input mask handler
+  // Auto pre-fill if client is already known on this device
+  useEffect(() => {
+    if (currentClientPhone) {
+      const found = getClientByPhone(currentClientPhone);
+      if (found) {
+        setClientPhone(found.phone);
+        setClientName(found.name);
+        if (found.notes) setNotes(found.notes);
+        setAutoRecognizedClient(found);
+      }
+    }
+  }, [currentClientPhone]);
+
+  // Phone input mask handler + auto lookup by WhatsApp number
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 11) value = value.slice(0, 11);
     setClientPhone(value);
+
+    // Auto lookup user by WhatsApp
+    if (value.length >= 10) {
+      const found = getClientByPhone(value);
+      if (found) {
+        if (!clientName.trim() || clientName === '') {
+          setClientName(found.name);
+        }
+        if (!notes && found.notes) {
+          setNotes(found.notes);
+        }
+        setAutoRecognizedClient(found);
+      } else {
+        setAutoRecognizedClient(null);
+      }
+    } else {
+      setAutoRecognizedClient(null);
+    }
   };
 
   // Submit appointment
@@ -203,6 +250,15 @@ export default function ClientBooking() {
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold transition-all cursor-pointer group"
+          >
+            <User className="w-3.5 h-3.5 shrink-0 group-hover:scale-110 transition-transform" />
+            <span>{currentClientPhone ? `Meu Cadastro (${formatPhone(currentClientPhone)})` : 'Acompanhar Meu Cadastro'}</span>
+          </button>
+
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018')}`}
             target="_blank"
@@ -653,6 +709,35 @@ export default function ClientBooking() {
             </div>
           </div>
 
+          {/* Recognized User Notification */}
+          {autoRecognizedClient && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-fadeIn">
+              <div className="flex items-center gap-2.5 text-emerald-400 font-semibold">
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center font-black text-xs text-emerald-400 shrink-0">
+                  ✓
+                </div>
+                <div>
+                  <span className="block font-bold text-white">Usuário identificado pelo WhatsApp!</span>
+                  <span className="text-[11px] text-zinc-400">
+                    Olá de volta, <strong>{autoRecognizedClient.name}</strong>. Seus dados foram preenchidos automaticamente.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setClientPhone('');
+                  setClientName('');
+                  setAutoRecognizedClient(null);
+                  logoutClient();
+                }}
+                className="text-[11px] text-zinc-400 hover:text-white underline font-medium cursor-pointer shrink-0 ml-2"
+              >
+                Trocar número
+              </button>
+            </div>
+          )}
+
           {/* Form Fields */}
           <div className="space-y-4">
             <div>
@@ -673,9 +758,16 @@ export default function ClientBooking() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Seu Celular / WhatsApp *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                  Seu Celular / WhatsApp (Chave de Acesso) *
+                </label>
+                {currentClientPhone && (
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Chave salva
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -688,7 +780,7 @@ export default function ClientBooking() {
                 />
               </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Enviaremos a confirmação e lembrete direto no seu WhatsApp.
+                O WhatsApp é a sua chave exclusiva. Seu usuário é salvo automaticamente no primeiro agendamento e você receberá o lembrete 2h antes!
               </span>
             </div>
 
@@ -910,6 +1002,14 @@ export default function ClientBooking() {
           {/* Secondary Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <User className="w-4 h-4" />
+              <span>Acompanhar Meu Cadastro</span>
+            </button>
+
+            <button
               onClick={handleNewBooking}
               className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
             >
@@ -946,6 +1046,13 @@ export default function ClientBooking() {
           />
         </div>
       )}
+
+      {/* Client Profile & Appointments Tracking Modal */}
+      <ClientProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onNewBookingClick={() => setStep(1)}
+      />
 
     </div>
   );

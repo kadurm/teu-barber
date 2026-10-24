@@ -6,8 +6,10 @@ import {
   INITIAL_APPOINTMENTS,
   INITIAL_FINANCIAL_RECORDS,
   INITIAL_ACQUISITIONS,
-  INITIAL_BLOCKED_SLOTS
+  INITIAL_BLOCKED_SLOTS,
+  INITIAL_CLIENTS
 } from '../data/initialData';
+import { generateWhatsAppLink, create2HourReminderWhatsAppMessage } from '../utils/formatters';
 
 const AppContext = createContext();
 
@@ -76,6 +78,17 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : INITIAL_BLOCKED_SLOTS;
   });
 
+  const [clients, setClients] = useState(() => {
+    const saved = localStorage.getItem('teu_barber_clients');
+    return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+  });
+
+  const [currentClientPhone, setCurrentClientPhone] = useState(() => {
+    return localStorage.getItem('teu_barber_current_client') || '';
+  });
+
+  const [reminder2hNotification, setReminder2hNotification] = useState(null);
+
   // Sync state to localStorage
   useEffect(() => {
     localStorage.setItem('teu_barber_shop_info', JSON.stringify(shopInfo));
@@ -105,6 +118,125 @@ export function AppProvider({ children }) {
     localStorage.setItem('teu_barber_blocked', JSON.stringify(blockedSlots));
   }, [blockedSlots]);
 
+  useEffect(() => {
+    localStorage.setItem('teu_barber_clients', JSON.stringify(clients));
+  }, [clients]);
+
+  useEffect(() => {
+    if (currentClientPhone) {
+      localStorage.setItem('teu_barber_current_client', currentClientPhone);
+    } else {
+      localStorage.removeItem('teu_barber_current_client');
+    }
+  }, [currentClientPhone]);
+
+  // Client Management Functions
+  const saveClientProfile = (phone, name, notes = '') => {
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    if (!cleanPhone) return null;
+
+    let updatedClient = null;
+    setClients(prev => {
+      const existingIdx = prev.findIndex(c => c.phone === cleanPhone);
+      if (existingIdx >= 0) {
+        const existing = prev[existingIdx];
+        updatedClient = {
+          ...existing,
+          name: name.trim() || existing.name,
+          notes: notes !== undefined ? notes.trim() : existing.notes,
+          updatedAt: new Date().toISOString()
+        };
+        const next = [...prev];
+        next[existingIdx] = updatedClient;
+        return next;
+      } else {
+        updatedClient = {
+          phone: cleanPhone,
+          name: name.trim(),
+          notes: notes.trim(),
+          createdAt: new Date().toISOString(),
+          totalBookings: 1
+        };
+        return [updatedClient, ...prev];
+      }
+    });
+
+    setCurrentClientPhone(cleanPhone);
+    return updatedClient;
+  };
+
+  const getClientByPhone = (phone) => {
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    if (!cleanPhone) return null;
+    return clients.find(c => c.phone === cleanPhone) || null;
+  };
+
+  const logoutClient = () => {
+    setCurrentClientPhone('');
+    localStorage.removeItem('teu_barber_current_client');
+  };
+
+  // Motor de Disparo Automático de Lembrete no WhatsApp (2 horas antes)
+  useEffect(() => {
+    const check2HourReminders = () => {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+
+      setAppointments(prev => {
+        let hasChanges = false;
+        const updated = prev.map(apt => {
+          if (apt.status !== 'confirmado' && apt.status !== 'pendente') return apt;
+          if (apt.date !== todayStr) return apt;
+          if (apt.reminder2hSent) return apt;
+
+          const [h, m] = (apt.time || '').split(':').map(Number);
+          if (isNaN(h) || isNaN(m)) return apt;
+
+          const aptDateTime = new Date();
+          aptDateTime.setHours(h, m, 0, 0);
+
+          const diffMinutes = Math.floor((aptDateTime.getTime() - now.getTime()) / (1000 * 60));
+
+          // Se estiver dentro da janela de 2 horas (0 a 120 minutos)
+          if (diffMinutes > 0 && diffMinutes <= 120) {
+            hasChanges = true;
+            const updatedApt = {
+              ...apt,
+              reminder2hSent: true,
+              reminder2hSentAt: new Date().toISOString()
+            };
+
+            // Notifica o sistema e aciona disparo no WhatsApp
+            setReminder2hNotification({
+              appointment: updatedApt,
+              diffMinutes,
+              triggeredAt: new Date().toISOString()
+            });
+
+            // Disparo automático via abertura de WhatsApp
+            try {
+              const msg = create2HourReminderWhatsAppMessage(updatedApt, shopInfo);
+              const url = generateWhatsAppLink(updatedApt.clientPhone, msg);
+              window.open(url, '_blank');
+            } catch (err) {
+              console.warn('Disparo automático bloqueado pelo navegador', err);
+            }
+
+            return updatedApt;
+          }
+
+          return apt;
+        });
+
+        return hasChanges ? updated : prev;
+      });
+    };
+
+    check2HourReminders();
+    const interval = setInterval(check2HourReminders, 30000);
+    return () => clearInterval(interval);
+  }, [shopInfo]);
+
   // Appointment Actions
   const addAppointment = (data) => {
     const id = `TB-${Date.now().toString().slice(-5)}`;
@@ -113,9 +245,18 @@ export function AppProvider({ children }) {
       status: 'confirmado',
       paymentMethod: 'pix',
       createdAt: new Date().toISOString(),
+      reminder2hSent: false,
       ...data,
     };
     setAppointments(prev => [newApt, ...prev]);
+
+    // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
+    if (data.clientPhone && data.clientName) {
+      saveClientProfile(data.clientPhone, data.clientName, data.notes || '');
+      const clean = data.clientPhone.replace(/\D/g, '');
+      setClients(prev => prev.map(c => c.phone === clean ? { ...c, totalBookings: (c.totalBookings || 0) + 1 } : c));
+    }
+
     return newApt;
   };
 
@@ -441,6 +582,14 @@ export function AppProvider({ children }) {
       financialRecords,
       acquisitions,
       blockedSlots,
+      clients,
+      currentClientPhone,
+      setCurrentClientPhone,
+      saveClientProfile,
+      getClientByPhone,
+      logoutClient,
+      reminder2hNotification,
+      setReminder2hNotification,
       addAppointment,
       updateAppointmentStatus,
       deleteAppointment,

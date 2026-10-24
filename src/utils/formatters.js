@@ -85,6 +85,19 @@ export function createReminderWhatsAppMessage(booking, shopInfo) {
     `Te esperamos lá! Caso precise remarcar, nos avise com antecedência. 💈`;
 }
 
+export function create2HourReminderWhatsAppMessage(booking, shopInfo) {
+  const address = shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG';
+  return `💈 *LEMBRETE DE AGENDAMENTO (DAQUI A 2 HORAS) - ${shopInfo?.name?.toUpperCase() || 'TEU BARBER STUDIO'}* 💈\n\n` +
+    `Olá, *${booking.clientName}*! Seu horário está se aproximando:\n\n` +
+    `⏰ *Horário Marcado:* ${booking.time} (daqui a menos de 2 horas!)\n` +
+    `📅 *Data:* ${formatDateBR(booking.date)} (${formatDateLongBR(booking.date)})\n` +
+    `✂️ *Serviço:* ${booking.serviceName} (${formatCurrency(booking.price)})\n` +
+    `🧔 *Profissional:* ${booking.barberName}\n` +
+    `🔖 *Código:* #${booking.id}\n` +
+    `📍 *Local:* ${address}\n\n` +
+    `Já estamos nos organizando para te receber com a melhor experiência! Se tiver algum imprevisto, avise por aqui. Até breve! 💈✂️`;
+}
+
 // Generates time slots based on start/end, lunch break, and step
 export function generateTimeSlots(start = "08:30", end = "19:30", stepMinutes = 30, lunchStart = "12:00", lunchEnd = "13:30") {
   const slots = [];

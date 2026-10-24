@@ -5,7 +5,8 @@ import {
   formatDateBR,
   formatPhone,
   generateWhatsAppLink,
-  createReminderWhatsAppMessage
+  createReminderWhatsAppMessage,
+  create2HourReminderWhatsAppMessage
 } from '../../utils/formatters';
 import {
   Calendar,
@@ -210,6 +211,21 @@ export default function AppointmentsTab() {
               const isFinished = apt.status === 'concluido';
               const isCancelled = apt.status === 'cancelado';
 
+  const isWithin2Hours = (appointment) => {
+    if (appointment.status === 'cancelado' || appointment.status === 'concluido') return false;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    if (appointment.date !== todayStr) return false;
+    const [h, m] = (appointment.time || '').split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return false;
+    const aptDateTime = new Date();
+    aptDateTime.setHours(h, m, 0, 0);
+    const diff = Math.floor((aptDateTime.getTime() - now.getTime()) / (1000 * 60));
+    return diff > 0 && diff <= 120;
+  };
+
+  const in2h = isWithin2Hours(apt);
+
               return (
                 <div
                   key={apt.id}
@@ -249,6 +265,12 @@ export default function AppointmentsTab() {
                           {apt.status}
                         </span>
 
+                        {in2h && (
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 animate-pulse">
+                            <Clock className="w-3 h-3 text-amber-400" /> Em menos de 2h
+                          </span>
+                        )}
+
                         <span className="text-[10px] text-slate-500 font-mono">
                           #{apt.id}
                         </span>
@@ -279,8 +301,25 @@ export default function AppointmentsTab() {
                   {/* Right Column: Actions */}
                   <div className="flex items-center gap-2 flex-wrap md:flex-nowrap justify-end pt-3 md:pt-0 border-t md:border-t-0 border-white/5">
                     
+                    {/* WhatsApp 2h Prior Reminder Button */}
+                    {apt.clientPhone && !isFinished && !isCancelled && in2h && (
+                      <a
+                        href={generateWhatsAppLink(
+                          apt.clientPhone,
+                          create2HourReminderWhatsAppMessage(apt, shopInfo)
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer animate-pulse"
+                        title="Disparar Lembrete WhatsApp (2 Horas Antes)"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Disparar Lembrete 2h</span>
+                      </a>
+                    )}
+
                     {/* WhatsApp Reminder Button */}
-                    {apt.clientPhone && !isFinished && !isCancelled && (
+                    {apt.clientPhone && !isFinished && !isCancelled && !in2h && (
                       <a
                         href={generateWhatsAppLink(
                           apt.clientPhone,

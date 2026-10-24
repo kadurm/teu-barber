@@ -312,3 +312,34 @@ export const INITIAL_ACQUISITIONS = [
 export const INITIAL_BLOCKED_SLOTS = [
   // Ex: { date: "2026-10-24", time: "12:00", barberId: "user1", reason: "Almoço" }
 ];
+
+export const INITIAL_CLIENTS = [
+  {
+    phone: "38988776655",
+    name: "Lucas Mendonça",
+    notes: "Degradê alto navalhado",
+    createdAt: "2026-10-01",
+    totalBookings: 3
+  },
+  {
+    phone: "38991234567",
+    name: "Marcos Vinicius",
+    notes: "Cabelo social na tesoura",
+    createdAt: "2026-10-05",
+    totalBookings: 2
+  },
+  {
+    phone: "38992348899",
+    name: "Rodrigo Almeida",
+    notes: "Primeira vez no estúdio",
+    createdAt: "2026-10-12",
+    totalBookings: 1
+  },
+  {
+    phone: "38993457788",
+    name: "Danilo Santos",
+    notes: "Barba alinhada com toalha quente",
+    createdAt: "2026-10-15",
+    totalBookings: 1
+  }
+];
