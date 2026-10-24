@@ -1096,7 +1096,6 @@ export default function ClientBooking() {
             }}
             onCancel={() => {
               setShowMercadoPagoModal(false);
-              setStep(5);
             }}
           />
         </div>

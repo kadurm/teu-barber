@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Smartphone,
   CheckCircle2,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
 
 export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentType = 'wallet', onPaymentConfirmed, onCancel }) {
@@ -147,11 +148,24 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
           </div>
         </div>
 
-        <div className="text-right">
-          <span className="text-[11px] text-slate-400 block">Total a pagar:</span>
-          <span className="text-xl font-black text-sky-400 font-serif">
-            {formatCurrency(booking.price)}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <span className="text-[11px] text-slate-400 block">Total a pagar:</span>
+            <span className="text-xl font-black text-sky-400 font-serif">
+              {formatCurrency(booking.price)}
+            </span>
+          </div>
+
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -437,17 +451,6 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
           </div>
         </form>
       )}
-
-      {/* Cancel or Pay Later option */}
-      <div className="mt-4 pt-3 border-t border-white/10 text-center">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
-        >
-          Prefiro pagar no local na barbearia
-        </button>
-      </div>
 
     </div>
   );
