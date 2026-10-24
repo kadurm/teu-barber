@@ -97,7 +97,15 @@ export const SERVICES = [
   { id: "limpeza_pele", name: "Limpeza de Pele / Máscara Black", price: 25.00, duration: 30, category: "estetica", description: "Remoção de cravos, esfoliação facial e máscara purificante de carvão ativado." },
 ];
 
+// Helper para gerar datas relativas dinâmicas para o histórico da barbearia
+const getPastDate = (daysAgo) => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString().split("T")[0];
+};
+
 export const INITIAL_APPOINTMENTS = [
+  // Hoje
   {
     id: "apt-101",
     clientName: "Lucas Mendes",
@@ -108,7 +116,7 @@ export const INITIAL_APPOINTMENTS = [
     serviceName: "Corte + Barba",
     price: 50.00,
     duration: 50,
-    date: new Date().toISOString().split("T")[0],
+    date: getPastDate(0),
     time: "09:00",
     status: "concluido",
     paymentMethod: "pix",
@@ -124,7 +132,7 @@ export const INITIAL_APPOINTMENTS = [
     serviceName: "Corte de Cabelo",
     price: 30.00,
     duration: 35,
-    date: new Date().toISOString().split("T")[0],
+    date: getPastDate(0),
     time: "10:00",
     status: "concluido",
     paymentMethod: "dinheiro",
@@ -140,7 +148,7 @@ export const INITIAL_APPOINTMENTS = [
     serviceName: "Corte + Barba + Sobrancelha",
     price: 60.00,
     duration: 60,
-    date: new Date().toISOString().split("T")[0],
+    date: getPastDate(0),
     time: "14:30",
     status: "confirmado",
     paymentMethod: "pix",
@@ -156,12 +164,416 @@ export const INITIAL_APPOINTMENTS = [
     serviceName: "Pé + Barba",
     price: 30.00,
     duration: 35,
-    date: new Date().toISOString().split("T")[0],
+    date: getPastDate(0),
     time: "16:00",
     status: "confirmado",
     paymentMethod: "cartao",
     notes: ""
   },
+
+  // 1 dia atrás
+  {
+    id: "apt-091",
+    clientName: "Felipe Nogueira",
+    clientPhone: "38998877665",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_barba_sobrancelha",
+    serviceName: "Corte + Barba + Sobrancelha",
+    price: 60.00,
+    duration: 60,
+    date: getPastDate(1),
+    time: "10:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-092",
+    clientName: "Carlos Eduardo",
+    clientPhone: "38997766554",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(1),
+    time: "11:30",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+  {
+    id: "apt-093",
+    clientName: "Bruno Silveira",
+    clientPhone: "38996655443",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "selagem",
+    serviceName: "Selagem Capilar",
+    price: 80.00,
+    duration: 75,
+    date: getPastDate(1),
+    time: "14:00",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+  {
+    id: "apt-094",
+    clientName: "Matheus Silva",
+    clientPhone: "38995544332",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(1),
+    time: "16:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-095",
+    clientName: "André Luiz",
+    clientPhone: "38994433221",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(1),
+    time: "18:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+
+  // 2 dias atrás
+  {
+    id: "apt-081",
+    clientName: "Samuel Costa",
+    clientPhone: "38993322110",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(2),
+    time: "09:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-082",
+    clientName: "Guilherme Santos",
+    clientPhone: "38992211009",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(2),
+    time: "11:00",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+  {
+    id: "apt-083",
+    clientName: "Renan Batista",
+    clientPhone: "38991100998",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_hidratacao",
+    serviceName: "Corte + Hidratação",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(2),
+    time: "14:30",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+  {
+    id: "apt-084",
+    clientName: "Igor Rocha",
+    clientPhone: "38990099887",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "pe_barba",
+    serviceName: "Pé + Barba",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(2),
+    time: "16:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-085",
+    clientName: "Victor Hugo",
+    clientPhone: "38989988776",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_sobrancelha",
+    serviceName: "Corte + Sobrancelha",
+    price: 40.00,
+    duration: 45,
+    date: getPastDate(2),
+    time: "17:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+
+  // 3 dias atrás
+  {
+    id: "apt-071",
+    clientName: "Leonardo Ribeiro",
+    clientPhone: "38988877665",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(3),
+    time: "10:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-072",
+    clientName: "Thiago Moreira",
+    clientPhone: "38987766554",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(3),
+    time: "14:00",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+  {
+    id: "apt-073",
+    clientName: "Daniel Souza",
+    clientPhone: "38986655443",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_pigmentacao",
+    serviceName: "Corte + Pigmentação",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(3),
+    time: "16:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-074",
+    clientName: "Lucas Vasconcelos",
+    clientPhone: "38985544332",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "barba",
+    serviceName: "Barba Completa",
+    price: 20.00,
+    duration: 30,
+    date: getPastDate(3),
+    time: "17:30",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+
+  // 4 dias atrás
+  {
+    id: "apt-061",
+    clientName: "Alexandre Pires",
+    clientPhone: "38984433221",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(4),
+    time: "11:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-062",
+    clientName: "Vinicius Prado",
+    clientPhone: "38983322110",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(4),
+    time: "15:00",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+  {
+    id: "apt-063",
+    clientName: "Douglas Faria",
+    clientPhone: "38982211009",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "pe_barba",
+    serviceName: "Pé + Barba",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(4),
+    time: "17:00",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+
+  // 5 dias atrás (Pico de sábado / feriado)
+  {
+    id: "apt-051",
+    clientName: "Eduardo Henrique",
+    clientPhone: "38981100998",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "platinado",
+    serviceName: "Platinado (a partir de)",
+    price: 100.00,
+    duration: 90,
+    date: getPastDate(5),
+    time: "09:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-052",
+    clientName: "Rafael Martins",
+    clientPhone: "38980099887",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte_barba_sobrancelha",
+    serviceName: "Corte + Barba + Sobrancelha",
+    price: 60.00,
+    duration: 60,
+    date: getPastDate(5),
+    time: "10:30",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+  {
+    id: "apt-053",
+    clientName: "Fabio Assunção",
+    clientPhone: "38979988776",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(5),
+    time: "13:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-054",
+    clientName: "Henrique Ramos",
+    clientPhone: "38978877665",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(5),
+    time: "15:00",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+  {
+    id: "apt-055",
+    clientName: "João Pedro",
+    clientPhone: "38977766554",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_relaxamento",
+    serviceName: "Corte + Relaxamento",
+    price: 70.00,
+    duration: 60,
+    date: getPastDate(5),
+    time: "16:30",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-056",
+    clientName: "Marcelo Dias",
+    clientPhone: "38976655443",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(5),
+    time: "18:00",
+    status: "concluido",
+    paymentMethod: "cartao"
+  },
+
+  // 6 dias atrás
+  {
+    id: "apt-041",
+    clientName: "Otávio Toledo",
+    clientPhone: "38975544332",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_barba",
+    serviceName: "Corte + Barba",
+    price: 50.00,
+    duration: 50,
+    date: getPastDate(6),
+    time: "11:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+  {
+    id: "apt-042",
+    clientName: "Caio Vilela",
+    clientPhone: "38974433221",
+    barberId: "user2",
+    barberName: "Gustavo",
+    serviceId: "corte",
+    serviceName: "Corte de Cabelo",
+    price: 30.00,
+    duration: 35,
+    date: getPastDate(6),
+    time: "14:30",
+    status: "concluido",
+    paymentMethod: "dinheiro"
+  },
+  {
+    id: "apt-043",
+    clientName: "Yago Meireles",
+    clientPhone: "38973322110",
+    barberId: "user1",
+    barberName: "Teu",
+    serviceId: "corte_sobrancelha",
+    serviceName: "Corte + Sobrancelha",
+    price: 40.00,
+    duration: 45,
+    date: getPastDate(6),
+    time: "16:00",
+    status: "concluido",
+    paymentMethod: "pix"
+  },
+
+  // Futuro
   {
     id: "apt-105",
     clientName: "Gabriel Ferreira",
@@ -181,6 +593,7 @@ export const INITIAL_APPOINTMENTS = [
 ];
 
 export const INITIAL_FINANCIAL_RECORDS = [
+  // Entradas de serviços correspondentes
   {
     id: "fin-1",
     type: "entrada",
@@ -190,7 +603,7 @@ export const INITIAL_FINANCIAL_RECORDS = [
     barberId: "user1",
     barberName: "Teu",
     paymentMethod: "pix",
-    date: new Date().toISOString().split("T")[0]
+    date: getPastDate(0)
   },
   {
     id: "fin-2",
@@ -201,7 +614,7 @@ export const INITIAL_FINANCIAL_RECORDS = [
     barberId: "user2",
     barberName: "Gustavo",
     paymentMethod: "dinheiro",
-    date: new Date().toISOString().split("T")[0]
+    date: getPastDate(0)
   },
   {
     id: "fin-3",
@@ -210,7 +623,7 @@ export const INITIAL_FINANCIAL_RECORDS = [
     description: "Lâminas descartáveis Derby & Golas higiênicas",
     amount: 68.00,
     paymentMethod: "pix",
-    date: new Date().toISOString().split("T")[0]
+    date: getPastDate(0)
   },
   {
     id: "fin-4",
@@ -219,7 +632,7 @@ export const INITIAL_FINANCIAL_RECORDS = [
     description: "Pomadas modeladoras matte e óleo de barba para revenda",
     amount: 220.00,
     paymentMethod: "cartao",
-    date: new Date().toISOString().split("T")[0]
+    date: getPastDate(1)
   },
   {
     id: "fin-5",
@@ -230,7 +643,49 @@ export const INITIAL_FINANCIAL_RECORDS = [
     barberId: "user1",
     barberName: "Teu",
     paymentMethod: "pix",
-    date: new Date().toISOString().split("T")[0]
+    date: getPastDate(0)
+  },
+  {
+    id: "fin-6",
+    type: "entrada",
+    category: "Serviço",
+    description: "Atendimento Bruno Silveira - Selagem Capilar",
+    amount: 80.00,
+    barberId: "user1",
+    barberName: "Teu",
+    paymentMethod: "cartao",
+    date: getPastDate(1)
+  },
+  {
+    id: "fin-7",
+    type: "entrada",
+    category: "Serviço",
+    description: "Atendimento Eduardo Henrique - Platinado",
+    amount: 100.00,
+    barberId: "user1",
+    barberName: "Teu",
+    paymentMethod: "pix",
+    date: getPastDate(5)
+  },
+  {
+    id: "fin-8",
+    type: "entrada",
+    category: "Serviço",
+    description: "Atendimento Rafael Martins - Corte + Barba + Sobrancelha",
+    amount: 60.00,
+    barberId: "user2",
+    barberName: "Gustavo",
+    paymentMethod: "cartao",
+    date: getPastDate(5)
+  },
+  {
+    id: "fin-9",
+    type: "saida",
+    category: "Manutenção",
+    description: "Afiação de tesouras e lâminas de corte",
+    amount: 55.00,
+    paymentMethod: "pix",
+    date: getPastDate(3)
   }
 ];
 
