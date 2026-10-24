@@ -37,7 +37,8 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
   const [installments, setInstallments] = useState('1');
 
   // Simulated unique Pix Copia e Cola payload
-  const pixPayload = `00020126580014br.gov.bcb.pix0136teubarber-${booking.id.toLowerCase()}520400005303986540${Number(booking.price).toFixed(2)}5802BR5917TEU BARBER STUDIO6013MONTES CLAROS62070503***6304`;
+  const bookingCode = (booking?.id || `TB-${Date.now().toString().slice(-5)}`).toLowerCase();
+  const pixPayload = `00020126580014br.gov.bcb.pix0136teubarber-${bookingCode}520400005303986540${Number(booking?.price || 0).toFixed(2)}5802BR5917TEU BARBER STUDIO6013MONTES CLAROS62070503***6304`;
 
   // Countdown timer
   useEffect(() => {

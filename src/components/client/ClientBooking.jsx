@@ -79,8 +79,9 @@ export default function ClientBooking() {
   // Service category filter
   const [selectedCategory, setSelectedCategory] = useState('todos');
 
-  // Confirmed booking state
+  // Confirmed booking state & pending draft for online payment
   const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [pendingBooking, setPendingBooking] = useState(null);
   const [copiedMessage, setCopiedMessage] = useState(false);
 
   // Selected Barber object
@@ -200,19 +201,24 @@ export default function ClientBooking() {
       paymentMethod
     };
 
-    const savedBooking = addAppointment(bookingPayload);
-    setConfirmedBooking(savedBooking);
-
-    // Gera o link da mensagem de confirmação para o WhatsApp
-    const whatsAppUrl = generateWhatsAppLink(
-      shopInfo.phone,
-      createBookingWhatsAppMessage(savedBooking, shopInfo)
-    );
-
     if (paymentMethod === 'mercadopago' || paymentMethod === 'wallet') {
+      // Quando o pagamento for online, o agendamento só é confirmado APÓS a aprovação no Mercado Pago / Carteira
+      setPendingBooking(bookingPayload);
       setShowMercadoPagoModal(true);
     } else {
-      // Abre imediatamente o WhatsApp com a mensagem pronta de confirmação
+      // Pagamento presencial no local: confirma imediatamente
+      const savedBooking = addAppointment({
+        ...bookingPayload,
+        status: 'confirmado',
+        paymentMethod: 'No Atendimento (Presencial)'
+      });
+      setConfirmedBooking(savedBooking);
+
+      const whatsAppUrl = generateWhatsAppLink(
+        shopInfo.phone,
+        createBookingWhatsAppMessage(savedBooking, shopInfo)
+      );
+
       try {
         window.open(whatsAppUrl, '_blank');
       } catch (err) {
@@ -230,6 +236,7 @@ export default function ClientBooking() {
     setClientPhone('');
     setNotes('');
     setConfirmedBooking(null);
+    setPendingBooking(null);
     setShowMercadoPagoModal(false);
     setStep(1);
   };
@@ -1074,18 +1081,28 @@ export default function ClientBooking() {
       )}
 
       {/* Mercado Pago Checkout Modal */}
-      {showMercadoPagoModal && confirmedBooking && (
+      {showMercadoPagoModal && pendingBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
           <MercadoPagoCheckout
-            booking={confirmedBooking}
+            booking={pendingBooking}
             shopInfo={shopInfo}
             initialPaymentType={paymentMethod === 'wallet' ? 'wallet' : 'pix'}
             onPaymentConfirmed={(method) => {
-              updateAppointmentStatus(confirmedBooking.id, 'confirmado', method);
+              // Somente agora, com o pagamento online APROVADO, salva o agendamento no sistema
+              const finalBooking = addAppointment({
+                ...pendingBooking,
+                status: 'confirmado',
+                paymentMethod: method,
+                paidOnline: true,
+                paidAt: new Date().toISOString()
+              });
+              setConfirmedBooking(finalBooking);
+              setPendingBooking(null);
               setShowMercadoPagoModal(false);
+
               const whatsAppUrl = generateWhatsAppLink(
                 shopInfo.phone,
-                createBookingWhatsAppMessage({ ...confirmedBooking, paymentMethod: method }, shopInfo)
+                createBookingWhatsAppMessage(finalBooking, shopInfo)
               );
               try {
                 window.open(whatsAppUrl, '_blank');
@@ -1096,6 +1113,7 @@ export default function ClientBooking() {
             }}
             onCancel={() => {
               setShowMercadoPagoModal(false);
+              setPendingBooking(null);
             }}
           />
         </div>
