@@ -31,12 +31,6 @@ export default function Navbar() {
                   STUDIO
                 </span>
               </div>
-              <p className="text-xs text-slate-400 flex items-center gap-2">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>{shopInfo.openTime} às {shopInfo.closeTime}</span>
-                <span>•</span>
-                <span>{shopInfo.displayPhone}</span>
-              </p>
             </div>
           </a>
 

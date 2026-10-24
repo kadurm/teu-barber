@@ -80,52 +80,12 @@ function AppContent() {
             <ClientBooking />
           </main>
 
-          {/* Barbershop Footer with updated official info */}
-          <footer className="border-t border-white/10 bg-[#08090b] py-8 text-xs text-slate-500">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          {/* Barbershop Footer */}
+          <footer className="border-t border-white/10 bg-[#08090b] py-6 text-xs text-slate-500">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3">
               
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3 text-center md:text-left">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-700 shrink-0">
-                    <img src={shopInfo.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <span className="font-serif font-bold text-slate-300 block text-sm">
-                      {shopInfo.name}
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      Excelência em cortes masculinos, barboterapia e visagismo.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-slate-400 text-xs">
-                  <a
-                    href={`https://wa.me/${shopInfo.phone}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-emerald-400 transition-colors flex items-center gap-1.5"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{shopInfo.displayPhone}</span>
-                  </a>
-
-                  <span>•</span>
-
-                  <a
-                    href={shopInfo.instagramUrl || "https://instagram.com/teu_barber.oficial"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-amber-400 transition-colors flex items-center gap-1.5"
-                  >
-                    <Instagram className="w-3.5 h-3.5 text-pink-400" />
-                    <span>{shopInfo.instagram}</span>
-                  </a>
-                </div>
-              </div>
-
               {/* Address & Hours row */}
-              <div className="pt-3 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
                 <div className="flex items-center gap-1.5 text-center sm:text-left">
                   <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span>{shopInfo.address}</span>
@@ -136,19 +96,9 @@ function AppContent() {
                 </div>
               </div>
 
-              {/* Copyright & Discreet Admin Access Link */}
-              <div className="pt-2 flex items-center justify-between text-[10px] text-slate-600">
-                <p>© {new Date().getFullYear()} {shopInfo.name}. Todos os direitos reservados.</p>
-                
-                {/* Discreet Admin Lock Link for the Barber */}
-                <button
-                  onClick={navigateToAdmin}
-                  className="text-slate-600 hover:text-slate-400 flex items-center gap-1 transition-colors p-1"
-                  title="Acesso Administrativo"
-                >
-                  <Lock className="w-3 h-3" />
-                  <span className="hover:underline">Acesso Barbeiro</span>
-                </button>
+              {/* Copyright Centralizado */}
+              <div className="pt-2 border-t border-white/5 text-center text-[11px] text-slate-500">
+                <p>© 2026 Teu Barber Studio. Todos os direitos reservados.</p>
               </div>
 
             </div>

@@ -184,26 +184,18 @@ export default function ClientBooking() {
           Teu Barber Studio
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-lg mx-auto">
-          Agende seu horário com os mestres da tesoura e navalha. Atendimento com precisão, conforto e estilo de primeira linha.
+          Agende seu horário de forma rápida e prática.
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
             <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG</span>
+            <span>Rua dos Mangabeiras, Sagrada Família</span>
           </span>
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
             <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>
           </span>
-          <a
-            href={shopInfo.instagramUrl || "https://instagram.com/teu_barber.oficial"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-amber-400 transition-colors"
-          >
-            <span>Instagram: @teu_barber.oficial</span>
-          </a>
         </div>
       </div>
 
@@ -257,7 +249,7 @@ export default function ClientBooking() {
               1. Escolha o Profissional
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Selecione com quem você prefere realizar seu corte ou atendimento
+              Selecione com quem você prefere realizar seu atendimento
             </p>
           </div>
 
@@ -293,10 +285,6 @@ export default function ClientBooking() {
                         <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
                           {barber.name}
                         </h3>
-                        <div className="flex items-center gap-1 text-xs text-amber-400 font-semibold">
-                          <Star className="w-3.5 h-3.5 fill-amber-400" />
-                          <span>{barber.rating}</span>
-                        </div>
                       </div>
 
                       <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -404,11 +392,6 @@ export default function ClientBooking() {
                           <h4 className="font-bold text-white text-base">
                             {service.name}
                           </h4>
-                          {service.category === 'combos' && (
-                            <span className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/30 px-1.5 py-0.2 rounded font-semibold">
-                              Popular
-                            </span>
-                          )}
                         </div>
                         <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                           {service.description}
