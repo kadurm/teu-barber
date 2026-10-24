@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatPhone } from '../../utils/formatters';
 import {
   Settings,
   Scissors,
@@ -40,10 +40,9 @@ export default function SettingsTab() {
 
   // Shop Info Form State
   const [shopName, setShopName] = useState(shopInfo.name);
-  const [shopPhone, setShopPhone] = useState(shopInfo.phone);
-  const [shopDisplayPhone, setShopDisplayPhone] = useState(shopInfo.displayPhone);
-  const [shopAddress, setShopAddress] = useState(shopInfo.address);
-  const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram);
+  const [shopPhone, setShopPhone] = useState(shopInfo.displayPhone || formatPhone(shopInfo.phone) || '(38) 99121-8119');
+  const [shopAddress, setShopAddress] = useState(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
+  const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.oficial');
   const [mpEnabled, setMpEnabled] = useState(shopInfo.mercadoPagoEnabled ?? true);
   const [mpPublicKey, setMpPublicKey] = useState(shopInfo.mercadoPagoPublicKey ?? '');
   const [mpAccessToken, setMpAccessToken] = useState(shopInfo.mercadoPagoAccessToken ?? '');
@@ -75,13 +74,24 @@ export default function SettingsTab() {
 
   const handleSaveShopInfo = (e) => {
     e.preventDefault();
+    const clean = shopPhone.replace(/\D/g, '');
+    let display = formatPhone(clean);
+    let full = clean;
+    if (clean.length === 10 || clean.length === 11) {
+      full = '55' + clean;
+      display = formatPhone(clean);
+    } else if (clean.startsWith('55') && clean.length >= 12) {
+      display = formatPhone(clean.slice(2));
+    }
+
     setShopInfo(prev => ({
       ...prev,
       name: shopName,
-      phone: shopPhone.replace(/\D/g, ''),
-      displayPhone: shopDisplayPhone,
+      phone: full,
+      displayPhone: display,
       address: shopAddress,
-      instagram: shopInstagram
+      instagram: shopInstagram,
+      instagramUrl: `https://instagram.com/${shopInstagram.replace('@', '')}`
     }));
     setShopSavedSuccess(true);
     setTimeout(() => setShopSavedSuccess(false), 3000);
@@ -300,7 +310,7 @@ export default function SettingsTab() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs pt-2">
           <div>
             <label className="text-slate-300 font-semibold block mb-1">Nome do Estabelecimento</label>
             <input
@@ -312,24 +322,20 @@ export default function SettingsTab() {
           </div>
 
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">WhatsApp (Número Completo)</label>
+            <label className="text-slate-300 font-semibold block mb-1">WhatsApp / Telefone</label>
             <input
-              type="text"
+              type="tel"
               value={shopPhone}
-              onChange={e => setShopPhone(e.target.value)}
-              placeholder="5538991218119"
-              className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
-            />
-          </div>
-
-          <div>
-            <label className="text-slate-300 font-semibold block mb-1">Telefone Formatado</label>
-            <input
-              type="text"
-              value={shopDisplayPhone}
-              onChange={e => setShopDisplayPhone(e.target.value)}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, '');
+                if (raw.length <= 11) {
+                  setShopPhone(formatPhone(raw));
+                } else {
+                  setShopPhone(e.target.value);
+                }
+              }}
               placeholder="(38) 99121-8119"
-              className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
+              className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400 font-mono"
             />
           </div>
 
@@ -344,12 +350,12 @@ export default function SettingsTab() {
           </div>
 
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">Instagram</label>
+            <label className="text-slate-300 font-semibold block mb-1">Instagram Oficial</label>
             <input
               type="text"
               value={shopInstagram}
               onChange={e => setShopInstagram(e.target.value)}
-              placeholder="@teubarberstudio"
+              placeholder="@teu_barber.oficial"
               className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
             />
           </div>
