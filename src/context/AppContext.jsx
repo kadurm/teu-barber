@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   SHOP_INFO,
   BARBERS,
@@ -10,6 +10,12 @@ import {
   INITIAL_CLIENTS
 } from '../data/initialData';
 import { generateWhatsAppLink, create2HourReminderWhatsAppMessage } from '../utils/formatters';
+import {
+  isFirebaseConfigured,
+  subscribeToCollection,
+  saveFirestoreDoc,
+  deleteFirestoreDoc
+} from '../services/firebase';
 
 const AppContext = createContext();
 
@@ -88,6 +94,85 @@ export function AppProvider({ children }) {
   });
 
   const [reminder2hNotification, setReminder2hNotification] = useState(null);
+  const [cloudConnected, setCloudConnected] = useState(() => isFirebaseConfigured());
+
+  // Conexão em tempo real com o Firestore (quando credenciais estiverem configuradas)
+  useEffect(() => {
+    if (!isFirebaseConfigured()) {
+      setCloudConnected(false);
+      return;
+    }
+
+    setCloudConnected(true);
+
+    // 1. Escuta agendamentos da nuvem
+    const unsubAppointments = subscribeToCollection('appointments', (cloudAppointments) => {
+      if (cloudAppointments && Array.isArray(cloudAppointments) && cloudAppointments.length > 0) {
+        setAppointments(prev => {
+          const map = new Map();
+          prev.forEach(item => { if (item.id) map.set(item.id, item); });
+          cloudAppointments.forEach(item => { if (item.id) map.set(item.id, item); });
+          return Array.from(map.values()).sort((a, b) => {
+            const dateA = `${a.date || ''} ${a.time || ''}`;
+            const dateB = `${b.date || ''} ${b.time || ''}`;
+            return dateB.localeCompare(dateA);
+          });
+        });
+      }
+    });
+
+    // 2. Escuta clientes da nuvem
+    const unsubClients = subscribeToCollection('clients', (cloudClients) => {
+      if (cloudClients && Array.isArray(cloudClients) && cloudClients.length > 0) {
+        setClients(prev => {
+          const map = new Map();
+          prev.forEach(c => { if (c.phone) map.set(c.phone, c); });
+          cloudClients.forEach(c => {
+            const phone = c.phone || c.id;
+            if (phone) map.set(phone, { ...c, phone });
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
+    // 3. Escuta barbeiros da nuvem
+    const unsubBarbers = subscribeToCollection('barbers', (cloudBarbers) => {
+      if (cloudBarbers && Array.isArray(cloudBarbers) && cloudBarbers.length > 0) {
+        setBarbers(cloudBarbers);
+      }
+    });
+
+    // 4. Escuta serviços da nuvem
+    const unsubServices = subscribeToCollection('services', (cloudServices) => {
+      if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
+        setServices(cloudServices);
+      }
+    });
+
+    // 5. Escuta financeiro da nuvem
+    const unsubFinancial = subscribeToCollection('financial', (cloudFin) => {
+      if (cloudFin && Array.isArray(cloudFin) && cloudFin.length > 0) {
+        setFinancialRecords(cloudFin);
+      }
+    });
+
+    // 6. Escuta horários bloqueados da nuvem
+    const unsubBlocked = subscribeToCollection('blocked_slots', (cloudBlocked) => {
+      if (cloudBlocked && Array.isArray(cloudBlocked) && cloudBlocked.length > 0) {
+        setBlockedSlots(cloudBlocked);
+      }
+    });
+
+    return () => {
+      unsubAppointments();
+      unsubClients();
+      unsubBarbers();
+      unsubServices();
+      unsubFinancial();
+      unsubBlocked();
+    };
+  }, []);
 
   // Sync state to localStorage
   useEffect(() => {
@@ -160,6 +245,10 @@ export function AppProvider({ children }) {
         return [updatedClient, ...prev];
       }
     });
+
+    if (isFirebaseConfigured() && updatedClient) {
+      saveFirestoreDoc('clients', cleanPhone, updatedClient);
+    }
 
     setCurrentClientPhone(cleanPhone);
     return updatedClient;
@@ -250,6 +339,11 @@ export function AppProvider({ children }) {
     };
     setAppointments(prev => [newApt, ...prev]);
 
+    // Grava no Firestore caso Firebase esteja conectado
+    if (isFirebaseConfigured()) {
+      saveFirestoreDoc('appointments', newApt.id, newApt);
+    }
+
     // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
     if (data.clientPhone && data.clientName) {
       saveClientProfile(data.clientPhone, data.clientName, data.notes || '');
@@ -261,6 +355,8 @@ export function AppProvider({ children }) {
   };
 
   const updateAppointmentStatus = (id, newStatus, paymentMethod) => {
+    let autoFinEntry = null;
+
     setAppointments(prev => prev.map(apt => {
       if (apt.id === id) {
         const updated = { ...apt, status: newStatus };
@@ -268,7 +364,7 @@ export function AppProvider({ children }) {
 
         // If completed and not registered in financial, automatically record entry
         if (newStatus === 'concluido' && apt.status !== 'concluido') {
-          const financialEntry = {
+          autoFinEntry = {
             id: `fin-auto-${Date.now()}`,
             type: 'entrada',
             category: 'Serviço',
@@ -280,17 +376,30 @@ export function AppProvider({ children }) {
             date: apt.date || new Date().toISOString().split('T')[0],
             appointmentId: apt.id
           };
-          setFinancialRecords(finPrev => [financialEntry, ...finPrev]);
+          setFinancialRecords(finPrev => [autoFinEntry, ...finPrev]);
         }
 
         return updated;
       }
       return apt;
     }));
+
+    if (isFirebaseConfigured()) {
+      saveFirestoreDoc('appointments', id, {
+        status: newStatus,
+        ...(paymentMethod ? { paymentMethod } : {})
+      });
+      if (autoFinEntry) {
+        saveFirestoreDoc('financial', autoFinEntry.id, autoFinEntry);
+      }
+    }
   };
 
   const deleteAppointment = (id) => {
     setAppointments(prev => prev.filter(apt => apt.id !== id));
+    if (isFirebaseConfigured()) {
+      deleteFirestoreDoc('appointments', id);
+    }
   };
 
   // Financial Actions
@@ -303,11 +412,17 @@ export function AppProvider({ children }) {
       amount: Number(record.amount)
     };
     setFinancialRecords(prev => [newRecord, ...prev]);
+    if (isFirebaseConfigured()) {
+      saveFirestoreDoc('financial', newRecord.id, newRecord);
+    }
     return newRecord;
   };
 
   const deleteFinancialRecord = (id) => {
     setFinancialRecords(prev => prev.filter(r => r.id !== id));
+    if (isFirebaseConfigured()) {
+      deleteFirestoreDoc('financial', id);
+    }
   };
 
   // Acquisition Goals Actions
@@ -375,9 +490,16 @@ export function AppProvider({ children }) {
     setBlockedSlots(prev => {
       const exists = prev.find(b => b.date === date && b.time === time && b.barberId === barberId);
       if (exists) {
+        if (isFirebaseConfigured() && exists.id) {
+          deleteFirestoreDoc('blocked_slots', exists.id);
+        }
         return prev.filter(b => !(b.date === date && b.time === time && b.barberId === barberId));
       } else {
-        return [...prev, { date, time, barberId, reason, id: `blk-${Date.now()}` }];
+        const newSlot = { date, time, barberId, reason, id: `blk-${Date.now()}` };
+        if (isFirebaseConfigured()) {
+          saveFirestoreDoc('blocked_slots', newSlot.id, newSlot);
+        }
+        return [...prev, newSlot];
       }
     });
   };
@@ -385,15 +507,31 @@ export function AppProvider({ children }) {
   // Service Management Actions
   const addService = (newService) => {
     const id = `srv-${Date.now()}`;
-    setServices(prev => [...prev, { ...newService, id, price: Number(newService.price), duration: Number(newService.duration) }]);
+    const serviceDoc = { ...newService, id, price: Number(newService.price), duration: Number(newService.duration) };
+    setServices(prev => [...prev, serviceDoc]);
+    if (isFirebaseConfigured()) {
+      saveFirestoreDoc('services', id, serviceDoc);
+    }
   };
 
   const updateService = (id, updates) => {
-    setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates, price: Number(updates.price ?? s.price), duration: Number(updates.duration ?? s.duration) } : s));
+    setServices(prev => prev.map(s => {
+      if (s.id === id) {
+        const updated = { ...s, ...updates, price: Number(updates.price ?? s.price), duration: Number(updates.duration ?? s.duration) };
+        if (isFirebaseConfigured()) {
+          saveFirestoreDoc('services', id, updated);
+        }
+        return updated;
+      }
+      return s;
+    }));
   };
 
   const deleteService = (id) => {
     setServices(prev => prev.filter(s => s.id !== id));
+    if (isFirebaseConfigured()) {
+      deleteFirestoreDoc('services', id);
+    }
   };
 
   // Barber / Partner Management
@@ -417,15 +555,27 @@ export function AppProvider({ children }) {
       admissionDate: barberData.admissionDate || new Date().toISOString().split('T')[0]
     };
     setBarbers(prev => [...prev, newBarber]);
+    if (isFirebaseConfigured()) {
+      saveFirestoreDoc('barbers', newBarber.id, newBarber);
+    }
     return newBarber;
   };
 
   const updateBarber = (id, updates) => {
-    setBarbers(prev => prev.map(b => b.id === id ? {
-      ...b,
-      ...updates,
-      commissionRate: updates.commissionRate !== undefined ? Number(updates.commissionRate) : b.commissionRate
-    } : b));
+    setBarbers(prev => prev.map(b => {
+      if (b.id === id) {
+        const updated = {
+          ...b,
+          ...updates,
+          commissionRate: updates.commissionRate !== undefined ? Number(updates.commissionRate) : b.commissionRate
+        };
+        if (isFirebaseConfigured()) {
+          saveFirestoreDoc('barbers', id, updated);
+        }
+        return updated;
+      }
+      return b;
+    }));
   };
 
   const deleteBarber = (id) => {
@@ -434,6 +584,9 @@ export function AppProvider({ children }) {
       return;
     }
     setBarbers(prev => prev.filter(b => b.id !== id));
+    if (isFirebaseConfigured()) {
+      deleteFirestoreDoc('barbers', id);
+    }
   };
 
   // Helper to convert HH:MM to minutes from midnight
@@ -608,7 +761,9 @@ export function AppProvider({ children }) {
       getAppointmentDuration,
       resetToInitialData,
       exportData,
-      importData
+      importData,
+      cloudConnected,
+      setCloudConnected
     }}>
       {children}
     </AppContext.Provider>

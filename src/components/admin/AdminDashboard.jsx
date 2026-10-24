@@ -14,7 +14,8 @@ import {
   LogOut,
   Menu,
   X,
-  Users
+  Users,
+  Flame
 } from 'lucide-react';
 import DashboardOverviewTab from './DashboardOverviewTab';
 import AppointmentsTab from './AppointmentsTab';
@@ -25,12 +26,14 @@ import AcquisitionsTab from './AcquisitionsTab';
 import IntelligenceTab from './IntelligenceTab';
 import SettingsTab from './SettingsTab';
 import NewAppointmentModal from './NewAppointmentModal';
+import FirebaseConfigModal from './FirebaseConfigModal';
 
 export default function AdminDashboard({ onBackToClient, onLogout }) {
-  const { shopInfo, appointments } = useApp();
+  const { shopInfo, appointments, cloudConnected, setCloudConnected } = useApp();
   const [activeAdminTab, setActiveAdminTab] = useState('dashboard');
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
 
   const pendingCount = appointments.filter(a => a.status === 'pendente' || a.status === 'confirmado').length;
 
@@ -178,6 +181,24 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
+                  setIsFirebaseModalOpen(true);
+                }}
+                className="w-full px-3.5 py-2 rounded-xl text-xs bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 font-semibold transition-all flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-400" />
+                  <span>Firebase Nuvem</span>
+                </div>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                  cloudConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-slate-400'
+                }`}>
+                  {cloudConnected ? 'Online' : 'Conectar'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
                   onBackToClient();
                 }}
                 className="w-full px-3.5 py-2.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2.5"
@@ -260,7 +281,25 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
           </nav>
 
           {/* Sidebar Bottom Actions */}
-          <div className="p-3.5 border-t border-white/10 space-y-1.5 bg-black/20">
+          <div className="p-3.5 border-t border-white/10 space-y-2 bg-black/20">
+            {/* Firebase Cloud Status Pill */}
+            <button
+              onClick={() => setIsFirebaseModalOpen(true)}
+              className="w-full px-3 py-2 rounded-xl text-xs bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 font-semibold transition-all flex items-center justify-between cursor-pointer group"
+              title="Configurações do Banco de Dados Firebase"
+            >
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>Firebase Nuvem</span>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                cloudConnected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/10 text-slate-400 border border-white/10'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${cloudConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
+                {cloudConnected ? 'Online' : 'Conectar'}
+              </span>
+            </button>
+
             <button
               onClick={onBackToClient}
               className="w-full px-3.5 py-2.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2.5 cursor-pointer font-medium"
@@ -297,7 +336,7 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
             {activeAdminTab === 'financial' && <FinancialTab />}
             {activeAdminTab === 'acquisitions' && <AcquisitionsTab />}
             {activeAdminTab === 'intelligence' && <IntelligenceTab />}
-            {activeAdminTab === 'settings' && <SettingsTab />}
+            {activeAdminTab === 'settings' && <SettingsTab onOpenFirebaseModal={() => setIsFirebaseModalOpen(true)} />}
           </div>
 
         </main>
@@ -308,6 +347,15 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
       {isNewAppointmentModalOpen && (
         <NewAppointmentModal onClose={() => setIsNewAppointmentModalOpen(false)} />
       )}
+
+      {/* Firebase Cloud Database Modal */}
+      <FirebaseConfigModal
+        isOpen={isFirebaseModalOpen}
+        onClose={() => setIsFirebaseModalOpen(false)}
+        onSaveSuccess={() => {
+          setCloudConnected(true);
+        }}
+      />
 
     </div>
   );
