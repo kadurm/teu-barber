@@ -1,0 +1,95 @@
+export function formatCurrency(value) {
+  if (value === undefined || value === null || isNaN(value)) return 'R$ 0,00';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
+}
+
+export function formatDateBR(dateString) {
+  if (!dateString) return '';
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+export function formatDateLongBR(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString + 'T12:00:00');
+  return new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+}
+
+export function formatPhone(phone) {
+  if (!phone) return '';
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 11) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
+  }
+  if (clean.length === 10) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
+  }
+  return phone;
+}
+
+export function cleanPhone(phone) {
+  return phone ? phone.replace(/\D/g, '') : '';
+}
+
+export function generateWhatsAppLink(phone, message) {
+  let clean = cleanPhone(phone);
+  if (!clean.startsWith('55') && clean.length >= 10) {
+    clean = '55' + clean;
+  }
+  return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
+}
+
+export function createBookingWhatsAppMessage(booking, shopInfo) {
+  return `💈 *NOVO AGENDAMENTO - ${shopInfo.name.toUpperCase()}* 💈\n\n` +
+    `👤 *Cliente:* ${booking.clientName}\n` +
+    `📱 *WhatsApp:* ${formatPhone(booking.clientPhone)}\n` +
+    `✂️ *Serviço:* ${booking.serviceName} (${formatCurrency(booking.price)})\n` +
+    `🧔 *Barbeiro:* ${booking.barberName}\n` +
+    `📅 *Data:* ${formatDateBR(booking.date)} (${formatDateLongBR(booking.date)})\n` +
+    `⏰ *Horário:* ${booking.time}\n` +
+    `🔖 *Código:* #${booking.id}\n\n` +
+    `_Agendamento realizado pelo site oficial Teu Barber Studio._`;
+}
+
+export function createReminderWhatsAppMessage(booking, shopInfo) {
+  return `Olá, ${booking.clientName}! Passando para lembrar do seu agendamento no *${shopInfo.name}*:\n\n` +
+    `✂️ *Serviço:* ${booking.serviceName}\n` +
+    `🧔 *Profissional:* ${booking.barberName}\n` +
+    `📅 *Data:* ${formatDateBR(booking.date)}\n` +
+    `⏰ *Horário:* ${booking.time}\n\n` +
+    `Te esperamos lá! Caso precise remarcar, nos avise com antecedência. 💈`;
+}
+
+// Generates time slots based on start/end, lunch break, and step
+export function generateTimeSlots(start = "08:30", end = "19:30", stepMinutes = 30, lunchStart = "12:00", lunchEnd = "13:30") {
+  const slots = [];
+  const [startH, startM] = start.split(':').map(Number);
+  const [endH, endM] = end.split(':').map(Number);
+  const [lunchStartH, lunchStartM] = lunchStart.split(':').map(Number);
+  const [lunchEndH, lunchEndM] = lunchEnd.split(':').map(Number);
+
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  const lStartMinutes = lunchStartH * 60 + lunchStartM;
+  const lEndMinutes = lunchEndH * 60 + lunchEndM;
+
+  for (let mins = startMinutes; mins < endMinutes; mins += stepMinutes) {
+    // Skip lunch break
+    if (mins >= lStartMinutes && mins < lEndMinutes) {
+      continue;
+    }
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    slots.push(formatted);
+  }
+
+  return slots;
+}
