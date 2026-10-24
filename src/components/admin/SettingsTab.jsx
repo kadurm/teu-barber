@@ -43,11 +43,7 @@ export default function SettingsTab() {
   const [shopPhone, setShopPhone] = useState(shopInfo.displayPhone || formatPhone(shopInfo.phone) || '(38) 99121-8119');
   const [shopAddress, setShopAddress] = useState(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
   const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.studio');
-  const [mpEnabled, setMpEnabled] = useState(shopInfo.mercadoPagoEnabled ?? true);
-  const [mpPublicKey, setMpPublicKey] = useState(shopInfo.mercadoPagoPublicKey ?? '');
-  const [mpAccessToken, setMpAccessToken] = useState(shopInfo.mercadoPagoAccessToken ?? '');
   const [shopSavedSuccess, setShopSavedSuccess] = useState(false);
-  const [mpSavedSuccess, setMpSavedSuccess] = useState(false);
 
   // File input ref for import
   const fileInputRef = React.useRef(null);
@@ -371,100 +367,7 @@ export default function SettingsTab() {
         </div>
       </form>
 
-      {/* Part 3: Mercado Pago Online Payments Configuration */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setShopInfo(prev => ({
-            ...prev,
-            mercadoPagoEnabled: mpEnabled,
-            mercadoPagoPublicKey: mpPublicKey.trim(),
-            mercadoPagoAccessToken: mpAccessToken.trim()
-          }));
-          setMpSavedSuccess(true);
-          setTimeout(() => setMpSavedSuccess(false), 3000);
-        }}
-        className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#009ee3] flex items-center justify-center font-black text-white text-sm">
-              mp
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white">
-                Integração Checkout Mercado Pago
-              </h3>
-              <p className="text-xs text-slate-400">
-                Receba pagamentos de agendamento online via Pix Instantâneo e Cartão de Crédito
-              </p>
-            </div>
-          </div>
-
-          {mpSavedSuccess && (
-            <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-lg flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Credenciais salvas!
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-3 pt-2 text-xs">
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer text-slate-200 font-semibold">
-              <input
-                type="checkbox"
-                checked={mpEnabled}
-                onChange={e => setMpEnabled(e.target.checked)}
-                className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-white/20 focus:ring-0"
-              />
-              <span>Ativar pagamentos online com Mercado Pago no agendamento</span>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-slate-300 font-semibold block mb-1">
-                Public Key (Chave Pública)
-              </label>
-              <input
-                type="text"
-                value={mpPublicKey}
-                onChange={e => setMpPublicKey(e.target.value)}
-                placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-sky-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-slate-300 font-semibold block mb-1">
-                Access Token (Token de Produção)
-              </label>
-              <input
-                type="password"
-                value={mpAccessToken}
-                onChange={e => setMpAccessToken(e.target.value)}
-                placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-sky-400"
-              />
-            </div>
-          </div>
-
-          <p className="text-[11px] text-slate-400 bg-white/5 p-3 rounded-xl">
-            💡 <strong>Onde obter:</strong> Acesse seu painel no <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noopener noreferrer" className="text-sky-400 underline font-semibold">Mercado Pago Developers</a> &gt; Suas Integrações &gt; Credenciais de Produção.
-          </p>
-        </div>
-
-        <div className="pt-2 flex justify-end">
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl bg-[#009ee3] hover:bg-sky-500 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-500/20"
-          >
-            Salvar Configurações do Mercado Pago
-          </button>
-        </div>
-      </form>
-
-      {/* Part 4: Data Backup, Import & Factory Reset */}
+      {/* Part 3: Data Backup, Import & Factory Reset */}
       <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
