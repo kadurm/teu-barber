@@ -42,7 +42,7 @@ export default function SettingsTab() {
   const [shopName, setShopName] = useState(shopInfo.name);
   const [shopPhone, setShopPhone] = useState(shopInfo.displayPhone || formatPhone(shopInfo.phone) || '(38) 99121-8119');
   const [shopAddress, setShopAddress] = useState(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
-  const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.oficial');
+  const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.studio');
   const [mpEnabled, setMpEnabled] = useState(shopInfo.mercadoPagoEnabled ?? true);
   const [mpPublicKey, setMpPublicKey] = useState(shopInfo.mercadoPagoPublicKey ?? '');
   const [mpAccessToken, setMpAccessToken] = useState(shopInfo.mercadoPagoAccessToken ?? '');
@@ -355,7 +355,7 @@ export default function SettingsTab() {
               type="text"
               value={shopInstagram}
               onChange={e => setShopInstagram(e.target.value)}
-              placeholder="@teu_barber.oficial"
+              placeholder="@teu_barber.studio"
               className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
             />
           </div>

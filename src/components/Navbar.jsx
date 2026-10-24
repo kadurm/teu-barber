@@ -4,6 +4,8 @@ import { Phone, Clock, MapPin, Instagram } from 'lucide-react';
 
 export default function Navbar() {
   const { shopInfo } = useApp();
+  const instagramHandle = shopInfo?.instagram ? shopInfo.instagram.replace('@', '').trim() : 'teu_barber.studio';
+  const instagramUrl = shopInfo?.instagramUrl || `https://instagram.com/${instagramHandle}`;
 
   return (
     <header className="sticky top-0 z-50 bg-[#0c0d0f]/95 backdrop-blur-md border-b border-white/10">
@@ -37,10 +39,11 @@ export default function Navbar() {
           {/* Customer Navigation Contacts */}
           <div className="flex items-center gap-2 sm:gap-3">
             <a
-              href={shopInfo.instagramUrl || "https://instagram.com/teu_barber.oficial"}
+              href={instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
+              title="Acessar Instagram @teu_barber.studio"
             >
               <Instagram className="w-3.5 h-3.5 text-pink-400" />
               <span>Instagram</span>

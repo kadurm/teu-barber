@@ -18,15 +18,18 @@ export function AppProvider({ children }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const rawIg = parsed.instagram || SHOP_INFO.instagram;
+        const instagram = (rawIg === '@teu_barber.oficial' || !rawIg) ? '@teu_barber.studio' : rawIg;
+        const cleanIg = instagram.replace('@', '').trim();
         return {
           ...SHOP_INFO,
           ...parsed,
           logoUrl: SHOP_INFO.logoUrl,
-          address: SHOP_INFO.address,
-          instagram: SHOP_INFO.instagram,
-          instagramUrl: SHOP_INFO.instagramUrl,
-          openTime: SHOP_INFO.openTime,
-          closeTime: SHOP_INFO.closeTime
+          address: (!parsed.address || parsed.address === 'Minas Gerais (Região 38)') ? SHOP_INFO.address : parsed.address,
+          instagram: instagram,
+          instagramUrl: `https://instagram.com/${cleanIg}`,
+          openTime: parsed.openTime || SHOP_INFO.openTime,
+          closeTime: parsed.closeTime || SHOP_INFO.closeTime
         };
       } catch (e) {
         return SHOP_INFO;
