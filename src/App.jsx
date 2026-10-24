@@ -15,13 +15,22 @@ function AppContent() {
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
     const search = window.location.search.toLowerCase();
-    return path.endsWith('/admin') || hash === '#admin' || hash.startsWith('#/admin') || search.includes('admin');
+    return path.includes('/admin') || hash === '#admin' || hash.startsWith('#/admin') || search.includes('admin');
   };
 
   const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdmin);
   const [isAdminAuth, setIsAdminAuth] = useState(() => {
     return sessionStorage.getItem('teu_barber_admin_auth') === 'true';
   });
+
+  // Dynamically update document title based on route
+  useEffect(() => {
+    if (isAdminRoute) {
+      document.title = 'Gestão';
+    } else {
+      document.title = 'Agendamento Online';
+    }
+  }, [isAdminRoute]);
 
   // Listen to url changes (hash or popstate)
   useEffect(() => {
