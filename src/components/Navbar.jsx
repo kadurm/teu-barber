@@ -37,27 +37,27 @@ export default function Navbar() {
           </a>
 
           {/* Customer Navigation Contacts */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <a
               href={instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-2 text-xs font-medium rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
               title="Acessar Instagram @teu_barber.studio"
             >
-              <Instagram className="w-3.5 h-3.5 text-pink-400" />
-              <span>Instagram</span>
+              <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
+              <span className="hidden sm:inline">Instagram</span>
             </a>
 
             <a
               href={`https://wa.me/${shopInfo.phone}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
+              className="flex items-center justify-center gap-1.5 p-2 sm:px-3.5 sm:py-2 text-xs font-semibold rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
               title="Falar no WhatsApp"
             >
-              <Phone className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
+              <Phone className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">WhatsApp</span>
             </a>
           </div>
 

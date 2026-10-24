@@ -90,7 +90,7 @@ function AppContent() {
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-center sm:text-left hover:text-amber-400 transition-colors cursor-pointer group"
+                  className="flex items-center justify-center sm:justify-start gap-1.5 text-center sm:text-left hover:text-amber-400 transition-colors cursor-pointer group"
                   title="Abrir no Google Maps"
                 >
                   <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
