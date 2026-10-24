@@ -1,33 +1,41 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
+  LayoutDashboard,
   Calendar,
   Clock,
   DollarSign,
   Sparkles,
+  TrendingUp,
   Settings,
   ShieldCheck,
   Scissors,
   ArrowLeft,
   LogOut
 } from 'lucide-react';
+import DashboardOverviewTab from './DashboardOverviewTab';
 import AppointmentsTab from './AppointmentsTab';
 import ScheduleTab from './ScheduleTab';
 import FinancialTab from './FinancialTab';
 import AcquisitionsTab from './AcquisitionsTab';
+import IntelligenceTab from './IntelligenceTab';
 import SettingsTab from './SettingsTab';
+import NewAppointmentModal from './NewAppointmentModal';
 
 export default function AdminDashboard({ onBackToClient, onLogout }) {
   const { shopInfo, appointments } = useApp();
-  const [activeAdminTab, setActiveAdminTab] = useState('appointments');
+  const [activeAdminTab, setActiveAdminTab] = useState('dashboard');
+  const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
 
   const pendingCount = appointments.filter(a => a.status === 'pendente' || a.status === 'confirmado').length;
 
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
     { id: 'appointments', label: 'Agenda & Atendimentos', icon: Calendar, badge: pendingCount > 0 ? pendingCount : null },
     { id: 'schedule', label: 'Horários & Expediente', icon: Clock },
     { id: 'financial', label: 'Financeiro & Caixa', icon: DollarSign },
     { id: 'acquisitions', label: 'Melhoria do Espaço', icon: Sparkles },
+    { id: 'intelligence', label: 'Inteligência & Sazonalidade', icon: TrendingUp },
     { id: 'settings', label: 'Catálogo & Configurações', icon: Settings },
   ];
 
@@ -106,12 +114,24 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
 
       {/* Active Tab Content */}
       <div className="animate-fadeIn">
+        {activeAdminTab === 'dashboard' && (
+          <DashboardOverviewTab
+            onNavigateTab={setActiveAdminTab}
+            onOpenNewAppointment={() => setIsNewAppointmentModalOpen(true)}
+          />
+        )}
         {activeAdminTab === 'appointments' && <AppointmentsTab />}
         {activeAdminTab === 'schedule' && <ScheduleTab />}
         {activeAdminTab === 'financial' && <FinancialTab />}
         {activeAdminTab === 'acquisitions' && <AcquisitionsTab />}
+        {activeAdminTab === 'intelligence' && <IntelligenceTab />}
         {activeAdminTab === 'settings' && <SettingsTab />}
       </div>
+
+      {/* Manual Appointment Modal */}
+      {isNewAppointmentModalOpen && (
+        <NewAppointmentModal onClose={() => setIsNewAppointmentModalOpen(false)} />
+      )}
 
     </div>
   );

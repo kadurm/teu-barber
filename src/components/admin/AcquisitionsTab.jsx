@@ -13,15 +13,18 @@ import {
   Tag,
   Scissors,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Edit2
 } from 'lucide-react';
 import NewAcquisitionModal from './NewAcquisitionModal';
+import EditAcquisitionModal from './EditAcquisitionModal';
 import ContributeModal from './ContributeModal';
 
 export default function AcquisitionsTab() {
   const { acquisitions, updateAcquisitionGoal, deleteAcquisitionGoal } = useApp();
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
   const [contributeTargetGoal, setContributeTargetGoal] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'em_economia', 'adquirido', 'planejado'
 
@@ -296,6 +299,14 @@ export default function AcquisitionsTab() {
                 )}
 
                 <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setEditingGoal(item)}
+                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-amber-400 text-xs transition-all cursor-pointer"
+                    title="Editar Meta"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+
                   {!isDone && (
                     <button
                       onClick={() => updateAcquisitionGoal(item.id, { status: 'adquirido', savedAmount: item.targetCost })}
@@ -331,6 +342,13 @@ export default function AcquisitionsTab() {
       <NewAcquisitionModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
+      />
+
+      {/* Edit Acquisition Modal */}
+      <EditAcquisitionModal
+        isOpen={!!editingGoal}
+        onClose={() => setEditingGoal(null)}
+        goal={editingGoal}
       />
 
       {/* Contribute / Deposit Modal */}

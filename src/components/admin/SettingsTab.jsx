@@ -12,8 +12,11 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  Edit2
+  Edit2,
+  Layers,
+  Filter
 } from 'lucide-react';
+import EditServiceModal from './EditServiceModal';
 
 export default function SettingsTab() {
   const {
@@ -32,6 +35,8 @@ export default function SettingsTab() {
 
   // New Service Form State
   const [isAddingService, setIsAddingService] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [selectedCatalogCategory, setSelectedCatalogCategory] = useState('all');
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration, setNewServiceDuration] = useState('30');
@@ -224,66 +229,131 @@ export default function SettingsTab() {
           </form>
         )}
 
-        {/* Services List Table */}
-        <div className="rounded-xl border border-white/10 overflow-hidden bg-slate-900/40">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-white/5 border-b border-white/10 text-slate-400 uppercase text-[10px]">
-              <tr>
-                <th className="py-2.5 px-3">Serviço</th>
-                <th className="py-2.5 px-3">Categoria</th>
-                <th className="py-2.5 px-3">Duração</th>
-                <th className="py-2.5 px-3 text-right">Preço</th>
-                <th className="py-2.5 px-3 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 text-slate-200">
-              {services.map(s => (
-                <tr key={s.id} className="hover:bg-white/[0.02]">
-                  <td className="py-2.5 px-3 font-semibold text-white">
-                    {s.name}
-                  </td>
-                  <td className="py-2.5 px-3 uppercase text-[10px] text-slate-400 font-mono">
-                    {s.category}
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-400">
-                    {s.duration} min
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-black font-serif text-amber-400">
-                    {formatCurrency(s.price)}
-                  </td>
-                  <td className="py-2.5 px-3 text-center">
-                    <button
-                      onClick={() => {
-                        const newPrice = prompt(`Novo preço para "${s.name}":`, s.price);
-                        if (newPrice !== null) {
-                          const num = parseFloat(newPrice);
-                          if (!isNaN(num) && num >= 0) {
-                            updateService(s.id, { price: num });
-                          }
-                        }
-                      }}
-                      className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-amber-400 mr-1"
-                      title="Alterar Preço"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Excluir serviço "${s.name}"?`)) {
-                          deleteService(s.id);
-                        }
-                      }}
-                      className="p-1 rounded hover:bg-red-500/10 text-slate-500 hover:text-red-400"
-                      title="Excluir Serviço"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <span className="text-xs text-slate-400 font-semibold mr-1 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" />
+            Filtrar:
+          </span>
+          {[
+            { id: 'all', label: 'Todas as Categorias', count: services.length },
+            { id: 'cabelo', label: 'Cabelo', count: services.filter(s => s.category === 'cabelo').length },
+            { id: 'barba', label: 'Barba', count: services.filter(s => s.category === 'barba').length },
+            { id: 'combos', label: 'Combos Econômicos', count: services.filter(s => s.category === 'combos').length },
+            { id: 'quimica', label: 'Química & Tratamentos', count: services.filter(s => s.category === 'quimica').length },
+            { id: 'estetica', label: 'Estética Facial', count: services.filter(s => s.category === 'estetica').length },
+          ].map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCatalogCategory(cat.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                selectedCatalogCategory === cat.id
+                  ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold'
+                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+              }`}
+            >
+              <span>{cat.label}</span>
+              <span className={`ml-1.5 text-[10px] px-1.5 py-0.2 rounded-full ${
+                selectedCatalogCategory === cat.id ? 'bg-slate-950 text-amber-400' : 'bg-white/10 text-slate-400'
+              }`}>
+                {cat.count}
+              </span>
+            </button>
+          ))}
         </div>
+
+        {/* Grouped Services Tables by Category */}
+        <div className="space-y-4 pt-1">
+          {['cabelo', 'barba', 'combos', 'quimica', 'estetica']
+            .filter(cat => selectedCatalogCategory === 'all' || selectedCatalogCategory === cat)
+            .map(categoryKey => {
+              const categoryServices = services.filter(s => s.category === categoryKey);
+              if (categoryServices.length === 0) return null;
+
+              const categoryLabels = {
+                cabelo: { name: 'Cabelo', badge: 'bg-blue-500/10 text-blue-300 border-blue-500/20' },
+                barba: { name: 'Barba & Modelagem', badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
+                combos: { name: 'Combos Econômicos', badge: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
+                quimica: { name: 'Química & Tratamentos Especiais', badge: 'bg-purple-500/10 text-purple-300 border-purple-500/20' },
+                estetica: { name: 'Estética Facial & Cuidados', badge: 'bg-pink-500/10 text-pink-300 border-pink-500/20' },
+              };
+
+              const catInfo = categoryLabels[categoryKey] || { name: categoryKey.toUpperCase(), badge: 'bg-white/10 text-white border-white/10' };
+
+              return (
+                <div key={categoryKey} className="rounded-xl border border-white/10 overflow-hidden bg-slate-900/40">
+                  <div className="px-4 py-2.5 bg-white/5 border-b border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-white">
+                        {catInfo.name}
+                      </span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${catInfo.badge}`}>
+                        {categoryServices.length} {categoryServices.length === 1 ? 'serviço' : 'serviços'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-black/20 text-slate-400 uppercase text-[10px] border-b border-white/5">
+                      <tr>
+                        <th className="py-2 px-3">Serviço</th>
+                        <th className="py-2 px-3">Duração</th>
+                        <th className="py-2 px-3 text-right">Preço</th>
+                        <th className="py-2 px-3 text-center w-24">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-slate-200">
+                      {categoryServices.map(s => (
+                        <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-2.5 px-3">
+                            <span className="font-semibold text-white block">{s.name}</span>
+                            {s.description && (
+                              <span className="text-[11px] text-slate-400 block line-clamp-1 mt-0.5">
+                                {s.description}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">
+                            {s.duration} min
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-black font-serif text-amber-400 whitespace-nowrap">
+                            {formatCurrency(s.price)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => setEditingService(s)}
+                              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-amber-400 mr-1 transition-colors cursor-pointer"
+                              title="Editar Serviço Completo"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Excluir serviço "${s.name}"?`)) {
+                                  deleteService(s.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                              title="Excluir Serviço"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Edit Service Modal */}
+        <EditServiceModal
+          isOpen={!!editingService}
+          onClose={() => setEditingService(null)}
+          service={editingService}
+        />
       </div>
 
       {/* Part 2: Shop Contact & Information */}
