@@ -7,6 +7,7 @@ import {
   formatPhone,
   generateWhatsAppLink,
   createBookingWhatsAppMessage,
+  createClientConfirmationWhatsAppMessage,
   generateTimeSlots
 } from '../../utils/formatters';
 import {
@@ -26,7 +27,9 @@ import {
   AlertCircle,
   CreditCard,
   QrCode,
-  ShieldCheck
+  ShieldCheck,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import MercadoPagoCheckout from './MercadoPagoCheckout';
 
@@ -55,6 +58,7 @@ export default function ClientBooking() {
 
   // Confirmed booking state
   const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [copiedMessage, setCopiedMessage] = useState(false);
 
   // Selected Barber object
   const selectedBarber = useMemo(() => {
@@ -145,9 +149,21 @@ export default function ClientBooking() {
     const savedBooking = addAppointment(bookingPayload);
     setConfirmedBooking(savedBooking);
 
+    // Gera o link da mensagem de confirmação para o WhatsApp
+    const whatsAppUrl = generateWhatsAppLink(
+      shopInfo.phone,
+      createBookingWhatsAppMessage(savedBooking, shopInfo)
+    );
+
     if (paymentMethod === 'mercadopago') {
       setShowMercadoPagoModal(true);
     } else {
+      // Abre imediatamente o WhatsApp com a mensagem pronta de confirmação
+      try {
+        window.open(whatsAppUrl, '_blank');
+      } catch (err) {
+        console.error('Popup do WhatsApp bloqueado', err);
+      }
       setStep(5);
     }
   };
@@ -824,8 +840,39 @@ export default function ClientBooking() {
               </div>
             </div>
 
-            {/* WhatsApp Direct Action Button */}
-            <div className="space-y-3">
+            {/* WhatsApp Confirmation Generated Banner */}
+            <div className="mb-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center gap-2 text-emerald-400 text-xs font-bold">
+              <MessageSquare className="w-4 h-4 shrink-0" />
+              <span>Mensagem de confirmação gerada para o WhatsApp!</span>
+            </div>
+
+            {/* WhatsApp Generated Message Preview */}
+            <div className="my-5 p-4 rounded-2xl bg-black/60 border border-white/10 text-left space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Mensagem Pronta para Envio
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createBookingWhatsAppMessage(confirmedBooking, shopInfo));
+                    setCopiedMessage(true);
+                    setTimeout(() => setCopiedMessage(false), 2000);
+                  }}
+                  className="text-[11px] font-semibold text-slate-300 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
+                >
+                  {copiedMessage ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedMessage ? 'Copiado!' : 'Copiar Mensagem'}
+                </button>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/90 border border-white/5 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto select-all">
+                {createBookingWhatsAppMessage(confirmedBooking, shopInfo)}
+              </div>
+            </div>
+
+            {/* WhatsApp Direct Action Buttons */}
+            <div className="space-y-2.5">
               <a
                 href={generateWhatsAppLink(
                   shopInfo.phone,
@@ -833,14 +880,29 @@ export default function ClientBooking() {
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-4 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <MessageSquare className="w-5 h-5 fill-slate-950" />
-                <span>Enviar Confirmação pelo WhatsApp</span>
+                <span>Abrir WhatsApp com Confirmação</span>
               </a>
 
-              <p className="text-[11px] text-slate-400">
-                Clique no botão acima para abrir a conversa no WhatsApp do Teu Barber com o comprovante pronto.
+              {confirmedBooking.clientPhone && (
+                <a
+                  href={generateWhatsAppLink(
+                    confirmedBooking.clientPhone,
+                    createClientConfirmationWhatsAppMessage(confirmedBooking, shopInfo)
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Enviar Comprovante para Meu WhatsApp</span>
+                </a>
+              )}
+
+              <p className="text-[11px] text-slate-400 pt-1">
+                A janela do WhatsApp foi iniciada. Caso seu navegador tenha bloqueado, toque no botão acima para confirmar seu horário com a barbearia.
               </p>
             </div>
           </div>
@@ -849,7 +911,7 @@ export default function ClientBooking() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={handleNewBooking}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
             >
               Fazer Outro Agendamento
             </button>
@@ -866,6 +928,15 @@ export default function ClientBooking() {
             onPaymentConfirmed={(method) => {
               updateAppointmentStatus(confirmedBooking.id, 'confirmado', method);
               setShowMercadoPagoModal(false);
+              const whatsAppUrl = generateWhatsAppLink(
+                shopInfo.phone,
+                createBookingWhatsAppMessage(confirmedBooking, shopInfo)
+              );
+              try {
+                window.open(whatsAppUrl, '_blank');
+              } catch (err) {
+                console.error('Erro ao abrir WhatsApp', err);
+              }
               setStep(5);
             }}
             onCancel={() => {

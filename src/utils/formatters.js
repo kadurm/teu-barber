@@ -47,15 +47,33 @@ export function generateWhatsAppLink(phone, message) {
 }
 
 export function createBookingWhatsAppMessage(booking, shopInfo) {
-  return `💈 *NOVO AGENDAMENTO - ${shopInfo.name.toUpperCase()}* 💈\n\n` +
+  const address = shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG';
+  return `💈 *NOVO AGENDAMENTO - ${shopInfo?.name?.toUpperCase() || 'TEU BARBER STUDIO'}* 💈\n\n` +
+    `Olá! Realizei um agendamento pelo site e gostaria de confirmar:\n\n` +
     `👤 *Cliente:* ${booking.clientName}\n` +
     `📱 *WhatsApp:* ${formatPhone(booking.clientPhone)}\n` +
     `✂️ *Serviço:* ${booking.serviceName} (${formatCurrency(booking.price)})\n` +
-    `🧔 *Barbeiro:* ${booking.barberName}\n` +
+    `🧔 *Profissional:* ${booking.barberName}\n` +
     `📅 *Data:* ${formatDateBR(booking.date)} (${formatDateLongBR(booking.date)})\n` +
     `⏰ *Horário:* ${booking.time}\n` +
-    `🔖 *Código:* #${booking.id}\n\n` +
-    `_Agendamento realizado pelo site oficial Teu Barber Studio._`;
+    `🔖 *Código da Reserva:* #${booking.id}\n` +
+    (booking.notes ? `📝 *Observação:* ${booking.notes}\n` : '') +
+    `📍 *Local:* ${address}\n\n` +
+    `_Aguardando confirmação! Teu Barber Studio._`;
+}
+
+export function createClientConfirmationWhatsAppMessage(booking, shopInfo) {
+  const address = shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG';
+  return `💈 *CONFIRMAÇÃO DE AGENDAMENTO - ${shopInfo?.name?.toUpperCase() || 'TEU BARBER STUDIO'}* 💈\n\n` +
+    `Olá, *${booking.clientName}*! Seu horário foi agendado com sucesso:\n\n` +
+    `✂️ *Serviço:* ${booking.serviceName} (${formatCurrency(booking.price)})\n` +
+    `🧔 *Profissional:* ${booking.barberName}\n` +
+    `📅 *Data:* ${formatDateBR(booking.date)} (${formatDateLongBR(booking.date)})\n` +
+    `⏰ *Horário:* ${booking.time}\n` +
+    `🔖 *Código do Agendamento:* #${booking.id}\n` +
+    (booking.notes ? `📝 *Observação:* ${booking.notes}\n` : '') +
+    `📍 *Local:* ${address}\n\n` +
+    `Qualquer dúvida ou caso precise reagendar, avise por aqui. Te esperamos! 💈✂️`;
 }
 
 export function createReminderWhatsAppMessage(booking, shopInfo) {

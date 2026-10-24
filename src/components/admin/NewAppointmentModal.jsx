@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Calendar, Clock, User, Phone, DollarSign } from 'lucide-react';
+import { X, Calendar, Clock, User, Phone, DollarSign, MessageSquare } from 'lucide-react';
+import { generateWhatsAppLink, createClientConfirmationWhatsAppMessage } from '../../utils/formatters';
 
 export default function NewAppointmentModal({ isOpen, onClose }) {
-  const { barbers, services, addAppointment } = useApp();
+  const { barbers, services, shopInfo, addAppointment } = useApp();
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -13,6 +14,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
   const [time, setTime] = useState('10:00');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
 
   if (!isOpen) return null;
 
@@ -26,7 +28,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
     const selectedBarber = barbers.find(b => b.id === barberId);
     const selectedService = services.find(s => s.id === serviceId);
 
-    addAppointment({
+    const newApt = addAppointment({
       clientName: clientName.trim(),
       clientPhone: clientPhone.replace(/\D/g, ''),
       barberId: selectedBarber.id,
@@ -41,6 +43,18 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
       paymentMethod,
       status: 'confirmado'
     });
+
+    if (sendWhatsApp && clientPhone.replace(/\D/g, '').length >= 10) {
+      const url = generateWhatsAppLink(
+        clientPhone,
+        createClientConfirmationWhatsAppMessage(newApt, shopInfo)
+      );
+      try {
+        window.open(url, '_blank');
+      } catch (err) {
+        console.error('Popup WhatsApp', err);
+      }
+    }
 
     onClose();
   };
@@ -168,6 +182,21 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
               onChange={e => setNotes(e.target.value)}
               className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white focus:outline-none focus:border-amber-400"
             />
+          </div>
+
+          {/* Enviar confirmação no WhatsApp */}
+          <div className="flex items-center gap-2 pt-1 pb-1">
+            <input
+              type="checkbox"
+              id="sendWhatsAppConfirm"
+              checked={sendWhatsApp}
+              onChange={e => setSendWhatsApp(e.target.checked)}
+              className="w-4 h-4 rounded bg-slate-900 border-white/20 text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+            />
+            <label htmlFor="sendWhatsAppConfirm" className="text-xs text-slate-300 flex items-center gap-1.5 cursor-pointer select-none">
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Gerar e abrir mensagem de confirmação no WhatsApp do cliente</span>
+            </label>
           </div>
 
           <div className="pt-3 flex justify-end gap-2">
