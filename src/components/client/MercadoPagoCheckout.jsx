@@ -9,14 +9,24 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Smartphone,
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 
-export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfirmed, onCancel }) {
-  const [paymentType, setPaymentType] = useState('pix'); // 'pix' or 'card'
+export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentType = 'wallet', onPaymentConfirmed, onCancel }) {
+  // Device detection: Apple Pay (iPhone/iPad/Mac Safari) vs Google Pay / Digital Wallet
+  const isAppleDevice = typeof navigator !== 'undefined' && (
+    /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) || 
+    (typeof window !== 'undefined' && !!window.ApplePaySession)
+  );
+
+  const [paymentType, setPaymentType] = useState(initialPaymentType || 'wallet'); // 'wallet', 'pix', 'card'
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes timer
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
 
   // Card form state
   const [cardNumber, setCardNumber] = useState('');
@@ -47,6 +57,53 @@ export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfir
     navigator.clipboard.writeText(pixPayload);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
+  };
+
+  const handlePayWithWallet = async () => {
+    setIsProcessing(true);
+    setProcessingStatus(isAppleDevice ? 'Autenticando com Face ID / Touch ID...' : 'Acessando Carteira Digital...');
+
+    // Try native browser PaymentRequest if supported
+    try {
+      if (typeof window !== 'undefined' && window.PaymentRequest) {
+        const supportedInstruments = [
+          {
+            supportedMethods: isAppleDevice ? 'https://apple.com/apple-pay' : 'basic-card',
+            data: {
+              supportedNetworks: ['visa', 'mastercard', 'elo', 'amex'],
+              supportedTypes: ['credit', 'debit']
+            }
+          }
+        ];
+
+        const details = {
+          total: {
+            label: `Teu Barber Studio - ${booking.serviceName}`,
+            amount: { currency: 'BRL', value: Number(booking.price).toFixed(2) }
+          }
+        };
+
+        const request = new PaymentRequest(supportedInstruments, details);
+        const canPay = await request.canMakePayment();
+        if (canPay) {
+          const paymentResponse = await request.show();
+          await paymentResponse.complete('success');
+          onPaymentConfirmed(isAppleDevice ? 'Apple Pay (Carteira do Celular)' : 'Google Pay (Carteira Digital)');
+          return;
+        }
+      }
+    } catch (e) {
+      console.log('PaymentRequest fallback simulation', e);
+    }
+
+    // Biometric confirmation simulation
+    setTimeout(() => {
+      setProcessingStatus(isAppleDevice ? '✓ Face ID Aprovado com Sucesso!' : '✓ Pagamento Autorizado na Carteira!');
+      setTimeout(() => {
+        setIsProcessing(false);
+        onPaymentConfirmed(isAppleDevice ? 'Apple Pay (Carteira do Celular)' : 'Google Pay (Carteira Digital)');
+      }, 700);
+    }, 1400);
   };
 
   const handleSimulateCardPayment = (e) => {
@@ -98,36 +155,131 @@ export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfir
         </div>
       </div>
 
-      {/* Tabs: Pix vs Cartão */}
-      <div className="grid grid-cols-2 gap-2 my-5 text-xs font-bold">
+      {/* Tabs: Carteira Digital vs Pix vs Cartão */}
+      <div className="grid grid-cols-3 gap-2 my-5 text-xs font-bold">
+        {/* Tab 1: Carteira do Celular */}
+        <button
+          type="button"
+          onClick={() => setPaymentType('wallet')}
+          className={`py-3 px-2 sm:px-4 rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            paymentType === 'wallet'
+              ? isAppleDevice 
+                ? 'bg-black text-white border-white/40 shadow-lg shadow-black/80 font-black ring-2 ring-white/20' 
+                : 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+          }`}
+        >
+          {isAppleDevice ? (
+            <>
+              <span className="text-base leading-none"></span>
+              <span className="truncate">Apple Pay</span>
+            </>
+          ) : (
+            <>
+              <Smartphone className="w-4 h-4 text-amber-400" />
+              <span className="truncate">Carteira Digital</span>
+            </>
+          )}
+        </button>
+
+        {/* Tab 2: Pix */}
         <button
           type="button"
           onClick={() => setPaymentType('pix')}
-          className={`py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+          className={`py-3 px-2 sm:px-4 rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
             paymentType === 'pix'
               ? 'bg-[#009ee3] text-slate-950 border-[#009ee3] font-black shadow-lg shadow-sky-500/20'
               : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
           }`}
         >
           <QrCode className="w-4 h-4" />
-          <span>Pix Instantâneo</span>
+          <span>Pix</span>
         </button>
 
+        {/* Tab 3: Cartão de Crédito */}
         <button
           type="button"
           onClick={() => setPaymentType('card')}
-          className={`py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+          className={`py-3 px-2 sm:px-4 rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
             paymentType === 'card'
               ? 'bg-[#009ee3] text-slate-950 border-[#009ee3] font-black shadow-lg shadow-sky-500/20'
               : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          <span>Cartão de Crédito</span>
+          <span>Cartão</span>
         </button>
       </div>
 
-      {/* ================= PIX VIEW ================= */}
+      {/* ================= 1. CARTEIRA DIGITAL VIEW (APPLE PAY / GOOGLE PAY) ================= */}
+      {paymentType === 'wallet' && (
+        <div className="space-y-4 animate-fadeIn text-xs">
+          <div className="p-5 rounded-2xl bg-black/50 border border-white/10 text-center space-y-3">
+            
+            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white">
+              {isAppleDevice ? (
+                <span className="text-3xl leading-none"></span>
+              ) : (
+                <Smartphone className="w-7 h-7 text-amber-400" />
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-base font-bold text-white flex items-center justify-center gap-1.5">
+                {isAppleDevice ? 'Apple Pay (Carteira do iPhone)' : 'Carteira Digital do Celular (Google Pay)'}
+              </h4>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
+                {isAppleDevice 
+                  ? 'Pague com 1 toque seguro usando Face ID ou Touch ID com os cartões cadastrados na Carteira do seu iPhone.'
+                  : 'Pague instantaneamente com 1 toque usando sua Carteira do Google ou cartão salvo no navegador.'}
+              </p>
+            </div>
+
+            {/* Visual Security Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Tokenização Criptografada de Ponta a Ponta</span>
+            </div>
+          </div>
+
+          {/* Action Button: Apple Pay or Google Pay */}
+          <div className="pt-2">
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={handlePayWithWallet}
+              className={`w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                isAppleDevice
+                  ? 'bg-black hover:bg-zinc-900 border border-white/20 text-white shadow-black/80'
+                  : 'bg-amber-400 hover:bg-amber-500 text-slate-950 shadow-amber-500/20'
+              }`}
+            >
+              {isProcessing ? (
+                <div className="flex items-center gap-2 normal-case font-bold">
+                  <span className={`w-4 h-4 border-2 ${isAppleDevice ? 'border-white' : 'border-slate-950'} border-t-transparent rounded-full animate-spin`}></span>
+                  <span>{processingStatus}</span>
+                </div>
+              ) : isAppleDevice ? (
+                <div className="flex items-center gap-2 normal-case">
+                  <span className="text-xl leading-none"></span>
+                  <span>Pagar com Apple Pay • {formatCurrency(booking.price)}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 normal-case">
+                  <Smartphone className="w-4 h-4" />
+                  <span>Pagar com Carteira Digital • {formatCurrency(booking.price)}</span>
+                </div>
+              )}
+            </button>
+          </div>
+
+          <p className="text-[11px] text-center text-slate-500">
+            Não precisa digitar o número do cartão. A autenticação é feita diretamente pelo seu aparelho.
+          </p>
+        </div>
+      )}
+
+      {/* ================= 2. PIX VIEW ================= */}
       {paymentType === 'pix' && (
         <div className="space-y-4 animate-fadeIn text-xs">
           <div className="p-4 rounded-2xl bg-black/40 border border-white/10 text-center">
@@ -200,7 +352,7 @@ export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfir
         </div>
       )}
 
-      {/* ================= CREDIT CARD VIEW ================= */}
+      {/* ================= 3. CREDIT CARD VIEW ================= */}
       {paymentType === 'card' && (
         <form onSubmit={handleSimulateCardPayment} className="space-y-3 animate-fadeIn text-xs">
           <div>
@@ -291,7 +443,7 @@ export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfir
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-slate-400 hover:text-white transition-colors"
+          className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
         >
           Prefiro pagar no local na barbearia
         </button>

@@ -29,12 +29,19 @@ import {
   QrCode,
   ShieldCheck,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Smartphone
 } from 'lucide-react';
 import MercadoPagoCheckout from './MercadoPagoCheckout';
 import ClientProfileModal from './ClientProfileModal';
 
 export default function ClientBooking() {
+  // Device detection for Apple Pay vs Google Pay
+  const isAppleDevice = typeof navigator !== 'undefined' && (
+    /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) || 
+    (typeof window !== 'undefined' && !!window.ApplePaySession)
+  );
+
   const {
     shopInfo,
     barbers,
@@ -66,7 +73,7 @@ export default function ClientBooking() {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('mercadopago'); // 'mercadopago' or 'local'
+  const [paymentMethod, setPaymentMethod] = useState('wallet'); // 'wallet', 'mercadopago', or 'local'
   const [showMercadoPagoModal, setShowMercadoPagoModal] = useState(false);
 
   // Service category filter
@@ -202,7 +209,7 @@ export default function ClientBooking() {
       createBookingWhatsAppMessage(savedBooking, shopInfo)
     );
 
-    if (paymentMethod === 'mercadopago') {
+    if (paymentMethod === 'mercadopago' || paymentMethod === 'wallet') {
       setShowMercadoPagoModal(true);
     } else {
       // Abre imediatamente o WhatsApp com a mensagem pronta de confirmação
@@ -789,50 +796,97 @@ export default function ClientBooking() {
                 Forma de Pagamento
               </label>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Mercado Pago Online */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Carteira Digital do Celular (Apple Pay / Google Pay) */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('wallet')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                    paymentMethod === 'wallet'
+                      ? isAppleDevice
+                        ? 'bg-zinc-900 border-white/60 ring-2 ring-white/30 shadow-lg shadow-black/80'
+                        : 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/30 shadow-lg shadow-amber-500/10'
+                      : 'bg-white/5 border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
+                    isAppleDevice ? 'bg-black border border-white/20 text-white' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  }`}>
+                    {isAppleDevice ? (
+                      <span className="text-xl leading-none font-sans font-bold"></span>
+                    ) : (
+                      <Smartphone className="w-5 h-5 text-amber-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-white text-xs truncate">
+                        {isAppleDevice ? 'Apple Pay' : 'Carteira Digital'}
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-black shrink-0 ${
+                        isAppleDevice 
+                          ? 'bg-white text-black font-mono' 
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {isAppleDevice ? 'iPhone' : 'Google Pay'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      {isAppleDevice 
+                        ? '1 toque com Face ID / Touch ID' 
+                        : 'Cartões salvos na sua conta/celular'}
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. Mercado Pago Online (Pix / Cartão) */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('mercadopago')}
-                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
                     paymentMethod === 'mercadopago'
-                      ? 'bg-sky-950/40 border-sky-400 ring-2 ring-sky-400/30'
+                      ? 'bg-sky-950/40 border-sky-400 ring-2 ring-sky-400/30 shadow-lg shadow-sky-500/10'
                       : 'bg-white/5 border-white/10 hover:border-white/20'
                   }`}
                 >
                   <div className="w-10 h-10 rounded-xl bg-[#009ee3] flex items-center justify-center shrink-0 shadow-md">
                     <span className="font-black text-white text-sm">mp</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-xs">Pagar Agora Online</span>
-                      <span className="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded font-semibold">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-white text-xs truncate">Pagar Online</span>
+                      <span className="text-[9px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded font-bold shrink-0">
                         Mercado Pago
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Pix Instantâneo (QR Code) ou Cartão de Crédito
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      Pix Instantâneo ou Cartão digitado
                     </p>
                   </div>
                 </button>
 
-                {/* Local Payment */}
+                {/* 3. Pagamento no Atendimento */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('local')}
-                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
                     paymentMethod === 'local'
-                      ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/30'
+                      ? 'bg-zinc-800 border-amber-400 ring-2 ring-amber-400/30 shadow-lg shadow-amber-500/10'
                       : 'bg-white/5 border-white/10 hover:border-white/20'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-                    <CreditCard className="w-5 h-5 text-amber-400" />
+                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-slate-300" />
                   </div>
-                  <div className="flex-1">
-                    <span className="font-bold text-white text-xs block">Pagar no Atendimento</span>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Pix, Dinheiro ou Cartão direto na barbearia
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-white text-xs truncate">Na Barbearia</span>
+                      <span className="text-[9px] bg-white/10 text-slate-300 border border-white/10 px-1.5 py-0.2 rounded font-bold shrink-0">
+                        Presencial
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      Pix, Dinheiro ou Cartão na hora
                     </p>
                   </div>
                 </button>
@@ -1025,12 +1079,13 @@ export default function ClientBooking() {
           <MercadoPagoCheckout
             booking={confirmedBooking}
             shopInfo={shopInfo}
+            initialPaymentType={paymentMethod === 'wallet' ? 'wallet' : 'pix'}
             onPaymentConfirmed={(method) => {
               updateAppointmentStatus(confirmedBooking.id, 'confirmado', method);
               setShowMercadoPagoModal(false);
               const whatsAppUrl = generateWhatsAppLink(
                 shopInfo.phone,
-                createBookingWhatsAppMessage(confirmedBooking, shopInfo)
+                createBookingWhatsAppMessage({ ...confirmedBooking, paymentMethod: method }, shopInfo)
               );
               try {
                 window.open(whatsAppUrl, '_blank');
