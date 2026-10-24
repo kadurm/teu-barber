@@ -188,10 +188,16 @@ export default function ClientBooking() {
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Rua dos Mangabeiras, Sagrada Família</span>
-          </span>
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-500/40 text-slate-300 hover:text-amber-400 transition-all cursor-pointer group"
+            title="Abrir no Google Maps"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="group-hover:underline">Rua dos Mangabeiras, Sagrada Família</span>
+          </a>
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
             <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>

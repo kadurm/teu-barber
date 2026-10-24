@@ -86,10 +86,16 @@ function AppContent() {
               
               {/* Address & Hours row */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-                <div className="flex items-center gap-1.5 text-center sm:text-left">
-                  <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span>{shopInfo.address}</span>
-                </div>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopInfo?.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-center sm:text-left hover:text-amber-400 transition-colors cursor-pointer group"
+                  title="Abrir no Google Maps"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
+                  <span className="group-hover:underline">{shopInfo?.address || "Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018"}</span>
+                </a>
 
                 <div>
                   <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>
