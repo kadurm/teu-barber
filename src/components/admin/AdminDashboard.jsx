@@ -5,7 +5,7 @@ import {
   Calendar,
   Clock,
   DollarSign,
-  Sparkles,
+  Target,
   TrendingUp,
   Settings,
   ShieldCheck,
@@ -37,7 +37,7 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
     { id: 'appointments', label: 'Agenda & Atendimentos', icon: Calendar, badge: pendingCount > 0 ? pendingCount : null },
     { id: 'schedule', label: 'Horários & Expediente', icon: Clock },
     { id: 'financial', label: 'Financeiro & Caixa', icon: DollarSign },
-    { id: 'acquisitions', label: 'Melhoria do Espaço', icon: Sparkles },
+    { id: 'acquisitions', label: 'Melhoria do Espaço', icon: Target },
     { id: 'intelligence', label: 'Inteligência & Sazonalidade', icon: TrendingUp },
     { id: 'settings', label: 'Catálogo & Configurações', icon: Settings },
   ];

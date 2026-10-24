@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Sparkles, DollarSign, Calendar, Tag } from 'lucide-react';
+import { X, Target, DollarSign, Calendar, Tag } from 'lucide-react';
 
 export default function NewAcquisitionModal({ isOpen, onClose }) {
   const { addAcquisitionGoal } = useApp();
@@ -45,7 +45,7 @@ export default function NewAcquisitionModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between pb-4 border-b border-white/10">
           <div>
             <h3 className="text-lg font-bold font-serif silver-text-gradient flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+              <Target className="w-4 h-4 text-amber-400" />
               Nova Meta de Aquisição para o Estúdio
             </h3>
             <p className="text-xs text-slate-400">

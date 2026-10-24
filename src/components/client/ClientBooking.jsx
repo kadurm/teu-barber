@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Phone,
   MessageSquare,
-  Sparkles,
   ArrowRight,
   ArrowLeft,
   Star,

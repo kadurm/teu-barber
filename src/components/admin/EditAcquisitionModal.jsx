@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Edit2, DollarSign, Calendar, Tag, PiggyBank, Sparkles } from 'lucide-react';
+import { X, Edit2, DollarSign, Calendar, Tag, PiggyBank, Target } from 'lucide-react';
 
 export default function EditAcquisitionModal({ isOpen, onClose, goal }) {
   const { updateAcquisitionGoal } = useApp();

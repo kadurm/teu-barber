@@ -9,8 +9,7 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
-  AlertCircle,
-  Sparkles
+  AlertCircle
 } from 'lucide-react';
 
 export default function MercadoPagoCheckout({ booking, shopInfo, onPaymentConfirmed, onCancel }) {

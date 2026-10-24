@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatDateBR } from '../../utils/formatters';
 import {
-  Sparkles,
+  Target,
   PiggyBank,
   CheckCircle2,
   Clock,
@@ -70,7 +70,7 @@ export default function AcquisitionsTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/10">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold font-serif silver-text-gradient flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
+            <Target className="w-5 h-5 text-amber-400" />
             Planejamento de Aquisições & Melhoria do Espaço
           </h2>
           <p className="text-xs text-slate-400">
