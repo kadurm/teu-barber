@@ -24,11 +24,15 @@ import {
   MapPin,
   Check,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  CreditCard,
+  QrCode,
+  ShieldCheck
 } from 'lucide-react';
+import MercadoPagoCheckout from './MercadoPagoCheckout';
 
-export default function ClientBooking({ onOpenAdmin }) {
-  const { shopInfo, barbers, services, addAppointment, isSlotAvailable } = useApp();
+export default function ClientBooking() {
+  const { shopInfo, barbers, services, addAppointment, isSlotAvailable, updateAppointmentStatus } = useApp();
 
   // Current wizard step: 1: Barber, 2: Service, 3: DateTime, 4: Client Info, 5: Confirmation
   const [step, setStep] = useState(1);
@@ -44,7 +48,8 @@ export default function ClientBooking({ onOpenAdmin }) {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('pix');
+  const [paymentMethod, setPaymentMethod] = useState('mercadopago'); // 'mercadopago' or 'local'
+  const [showMercadoPagoModal, setShowMercadoPagoModal] = useState(false);
 
   // Service category filter
   const [selectedCategory, setSelectedCategory] = useState('todos');
@@ -140,7 +145,12 @@ export default function ClientBooking({ onOpenAdmin }) {
 
     const savedBooking = addAppointment(bookingPayload);
     setConfirmedBooking(savedBooking);
-    setStep(5);
+
+    if (paymentMethod === 'mercadopago') {
+      setShowMercadoPagoModal(true);
+    } else {
+      setStep(5);
+    }
   };
 
   // Reset booking form
@@ -151,6 +161,7 @@ export default function ClientBooking({ onOpenAdmin }) {
     setClientPhone('');
     setNotes('');
     setConfirmedBooking(null);
+    setShowMercadoPagoModal(false);
     setStep(1);
   };
 
@@ -167,9 +178,6 @@ export default function ClientBooking({ onOpenAdmin }) {
               className="w-full h-full object-cover rounded-full" 
             />
           </div>
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-950 font-black text-[10px] tracking-widest uppercase px-3 py-0.5 rounded-full shadow-md">
-            EXECUTIVE STUDIO
-          </div>
         </div>
 
         <h1 className="font-serif text-3xl sm:text-4xl font-black uppercase tracking-wider silver-text-gradient mb-2">
@@ -180,14 +188,22 @@ export default function ClientBooking({ onOpenAdmin }) {
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-            <MapPin className="w-3.5 h-3.5 text-amber-400" />
-            Minas Gerais (Região 38)
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG</span>
           </span>
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            Terça a Sábado: {shopInfo.openTime} às {shopInfo.closeTime}
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>
           </span>
+          <a
+            href={shopInfo.instagramUrl || "https://instagram.com/teu_barber.oficial"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-amber-400 transition-colors"
+          >
+            <span>Instagram: @teu_barber.oficial</span>
+          </a>
         </div>
       </div>
 
@@ -276,11 +292,6 @@ export default function ClientBooking({ onOpenAdmin }) {
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
                           {barber.name}
-                          {barber.id === 'user1' && (
-                            <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold">
-                              Master
-                            </span>
-                          )}
                         </h3>
                         <div className="flex items-center gap-1 text-xs text-amber-400 font-semibold">
                           <Star className="w-3.5 h-3.5 fill-amber-400" />
@@ -672,28 +683,57 @@ export default function ClientBooking({ onOpenAdmin }) {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Forma de Pagamento Preferida
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">
+                Forma de Pagamento
               </label>
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { id: 'pix', label: 'Pix no local' },
-                  { id: 'dinheiro', label: 'Dinheiro' },
-                  { id: 'cartao', label: 'Cartão de Débito/Crédito' },
-                ].map(p => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    onClick={() => setPaymentMethod(p.id)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-medium border text-center transition-all ${
-                      paymentMethod === p.id
-                        ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold'
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Mercado Pago Online */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('mercadopago')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                    paymentMethod === 'mercadopago'
+                      ? 'bg-sky-950/40 border-sky-400 ring-2 ring-sky-400/30'
+                      : 'bg-white/5 border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[#009ee3] flex items-center justify-center shrink-0 shadow-md">
+                    <span className="font-black text-white text-sm">mp</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-xs">Pagar Agora Online</span>
+                      <span className="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded font-semibold">
+                        Mercado Pago
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Pix Instantâneo (QR Code) ou Cartão de Crédito
+                    </p>
+                  </div>
+                </button>
+
+                {/* Local Payment */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('local')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                    paymentMethod === 'local'
+                      ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/30'
+                      : 'bg-white/5 border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-bold text-white text-xs block">Pagar no Atendimento</span>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Pix, Dinheiro ou Cartão direto na barbearia
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -819,14 +859,26 @@ export default function ClientBooking({ onOpenAdmin }) {
             >
               Fazer Outro Agendamento
             </button>
-
-            <button
-              onClick={onOpenAdmin}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-semibold transition-all"
-            >
-              Ver na Agenda do Barbeiro
-            </button>
           </div>
+        </div>
+      )}
+
+      {/* Mercado Pago Checkout Modal */}
+      {showMercadoPagoModal && confirmedBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
+          <MercadoPagoCheckout
+            booking={confirmedBooking}
+            shopInfo={shopInfo}
+            onPaymentConfirmed={(method) => {
+              updateAppointmentStatus(confirmedBooking.id, 'confirmado', method);
+              setShowMercadoPagoModal(false);
+              setStep(5);
+            }}
+            onCancel={() => {
+              setShowMercadoPagoModal(false);
+              setStep(5);
+            }}
+          />
         </div>
       )}
 

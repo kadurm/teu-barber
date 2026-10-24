@@ -8,7 +8,8 @@ import {
   Settings,
   ShieldCheck,
   Scissors,
-  ArrowLeft
+  ArrowLeft,
+  LogOut
 } from 'lucide-react';
 import AppointmentsTab from './AppointmentsTab';
 import ScheduleTab from './ScheduleTab';
@@ -16,7 +17,7 @@ import FinancialTab from './FinancialTab';
 import AcquisitionsTab from './AcquisitionsTab';
 import SettingsTab from './SettingsTab';
 
-export default function AdminDashboard({ onBackToClient }) {
+export default function AdminDashboard({ onBackToClient, onLogout }) {
   const { shopInfo, appointments } = useApp();
   const [activeAdminTab, setActiveAdminTab] = useState('appointments');
 
@@ -54,13 +55,24 @@ export default function AdminDashboard({ onBackToClient }) {
           </div>
         </div>
 
-        <button
-          onClick={onBackToClient}
-          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 self-start md:self-auto transition-all"
-        >
-          <Scissors className="w-3.5 h-3.5 text-amber-400" />
-          <span>Abrir Visão do Cliente</span>
-        </button>
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+          <button
+            onClick={onBackToClient}
+            className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all"
+          >
+            <Scissors className="w-3.5 h-3.5 text-amber-400" />
+            <span>Visão do Cliente</span>
+          </button>
+
+          <button
+            onClick={onLogout}
+            className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+            title="Sair do painel administrativo"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sair (Logout)</span>
+          </button>
+        </div>
       </div>
 
       {/* Admin Navigation Tabs */}

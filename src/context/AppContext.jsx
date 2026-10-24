@@ -15,12 +15,37 @@ export function AppProvider({ children }) {
   // Load from localStorage or defaults
   const [shopInfo, setShopInfo] = useState(() => {
     const saved = localStorage.getItem('teu_barber_shop_info');
-    return saved ? JSON.parse(saved) : SHOP_INFO;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...SHOP_INFO,
+          ...parsed,
+          logoUrl: SHOP_INFO.logoUrl,
+          address: SHOP_INFO.address,
+          instagram: SHOP_INFO.instagram,
+          instagramUrl: SHOP_INFO.instagramUrl,
+          openTime: SHOP_INFO.openTime,
+          closeTime: SHOP_INFO.closeTime
+        };
+      } catch (e) {
+        return SHOP_INFO;
+      }
+    }
+    return SHOP_INFO;
   });
 
   const [barbers, setBarbers] = useState(() => {
     const saved = localStorage.getItem('teu_barber_barbers');
-    return saved ? JSON.parse(saved) : BARBERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map(b => b.id === 'user1' ? { ...b, role: 'Barbeiro & Proprietário', avatar: SHOP_INFO.logoUrl } : b);
+      } catch (e) {
+        return BARBERS;
+      }
+    }
+    return BARBERS;
   });
 
   const [services, setServices] = useState(() => {

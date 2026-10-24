@@ -1,23 +1,21 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Scissors, ShieldCheck, Calendar, Phone, Clock, Instagram } from 'lucide-react';
+import { Phone, Clock, MapPin, Instagram } from 'lucide-react';
 
-export default function Navbar({ activeTab, setActiveTab }) {
-  const { shopInfo, appointments } = useApp();
-
-  const pendingAppointmentsCount = appointments.filter(a => a.status === 'pendente' || a.status === 'confirmado').length;
+export default function Navbar() {
+  const { shopInfo } = useApp();
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0c0d0f]/90 backdrop-blur-md border-b border-white/10">
+    <header className="sticky top-0 z-50 bg-[#0c0d0f]/95 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
           {/* Logo & Brand */}
-          <div 
-            onClick={() => setActiveTab('client')} 
-            className="flex items-center gap-3 cursor-pointer group"
+          <a 
+            href="./" 
+            className="flex items-center gap-3 group cursor-pointer"
           >
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-slate-400/40 shadow-lg shadow-black/50 group-hover:border-amber-400/60 transition-all">
+            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-white/20 shadow-lg shadow-black/50 group-hover:border-amber-400/60 transition-all flex items-center justify-center bg-black/40">
               <img 
                 src={shopInfo.logoUrl} 
                 alt="Teu Barber Studio" 
@@ -35,54 +33,36 @@ export default function Navbar({ activeTab, setActiveTab }) {
               </div>
               <p className="text-xs text-slate-400 flex items-center gap-2">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                {shopInfo.openTime} às {shopInfo.closeTime} • {shopInfo.displayPhone}
+                <span>{shopInfo.openTime} às {shopInfo.closeTime}</span>
+                <span>•</span>
+                <span>{shopInfo.displayPhone}</span>
               </p>
             </div>
-          </div>
+          </a>
 
-          {/* Desktop Navigation */}
-          <nav className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setActiveTab('client')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'client'
-                  ? 'bg-gradient-to-r from-slate-200 to-slate-300 text-slate-900 shadow-lg shadow-white/10 font-bold'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
+          {/* Customer Navigation Contacts */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href={shopInfo.instagramUrl || "https://instagram.com/teu_barber.oficial"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
             >
-              <Scissors className="w-4 h-4" />
-              <span>Agendar</span>
-            </button>
+              <Instagram className="w-3.5 h-3.5 text-pink-400" />
+              <span>Instagram</span>
+            </a>
 
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all relative ${
-                activeTab === 'admin'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Painel Gestão</span>
-              {pendingAppointmentsCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-red-600 text-white text-[10px] font-bold rounded-full">
-                  {pendingAppointmentsCount}
-                </span>
-              )}
-            </button>
-
-            {/* Direct WhatsApp Call */}
             <a
               href={`https://wa.me/${shopInfo.phone}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
               title="Falar no WhatsApp"
             >
               <Phone className="w-3.5 h-3.5" />
               <span>WhatsApp</span>
             </a>
-          </nav>
+          </div>
 
         </div>
       </div>

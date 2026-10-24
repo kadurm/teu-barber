@@ -1,24 +1,32 @@
+import logoImg from '../assets/logo.png';
+
 export const SHOP_INFO = {
   name: "Teu Barber Studio",
   slug: "teu-barber",
   phone: "5538991218119",
   displayPhone: "(38) 99121-8119",
-  address: "Minas Gerais (Região 38)",
-  instagram: "@teubarberstudio",
-  openTime: "08:30",
-  closeTime: "19:30",
+  address: "Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018",
+  instagram: "@teu_barber.oficial",
+  instagramUrl: "https://instagram.com/teu_barber.oficial",
+  openTime: "09:00",
+  closeTime: "20:00",
+  saturdayOpenTime: "09:00",
+  saturdayCloseTime: "18:00",
   lunchStart: "12:00",
   lunchEnd: "13:30",
   slotDurationMinutes: 30,
-  logoUrl: "/logo.jpg"
+  logoUrl: logoImg,
+  mercadoPagoEnabled: true,
+  mercadoPagoPublicKey: "",
+  mercadoPagoAccessToken: ""
 };
 
 export const BARBERS = [
   {
     id: "user1",
     name: "Teu",
-    role: "Proprietário & Master Barber",
-    avatar: "/logo.jpg",
+    role: "Barbeiro & Proprietário",
+    avatar: logoImg,
     rating: "4.9",
     totalReviews: 248,
     specialty: "Cortes Modernos, Degradê Navalhado, Platinados & Barboterapia",
