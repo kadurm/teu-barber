@@ -255,6 +255,46 @@ export function AppProvider({ children }) {
     setServices(prev => prev.filter(s => s.id !== id));
   };
 
+  // Barber / Partner Management
+  const addBarber = (barberData) => {
+    const id = `user-${Date.now().toString().slice(-4)}`;
+    const newBarber = {
+      id,
+      name: barberData.name.trim(),
+      role: barberData.role || 'Barbeiro Profissional',
+      phone: barberData.phone || '',
+      document: barberData.document || '',
+      pixKey: barberData.pixKey || '',
+      pixKeyType: barberData.pixKeyType || 'CPF',
+      commissionRate: Number(barberData.commissionRate ?? 50),
+      avatar: barberData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      specialty: barberData.specialty || '',
+      bio: barberData.bio || '',
+      rating: '5.0',
+      totalReviews: 0,
+      active: true,
+      admissionDate: barberData.admissionDate || new Date().toISOString().split('T')[0]
+    };
+    setBarbers(prev => [...prev, newBarber]);
+    return newBarber;
+  };
+
+  const updateBarber = (id, updates) => {
+    setBarbers(prev => prev.map(b => b.id === id ? {
+      ...b,
+      ...updates,
+      commissionRate: updates.commissionRate !== undefined ? Number(updates.commissionRate) : b.commissionRate
+    } : b));
+  };
+
+  const deleteBarber = (id) => {
+    if (id === 'user1') {
+      alert("O barbeiro proprietário não pode ser excluído.");
+      return;
+    }
+    setBarbers(prev => prev.filter(b => b.id !== id));
+  };
+
   // Helper to convert HH:MM to minutes from midnight
   const timeToMinutes = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -393,6 +433,9 @@ export function AppProvider({ children }) {
       setShopInfo,
       barbers,
       setBarbers,
+      addBarber,
+      updateBarber,
+      deleteBarber,
       services,
       appointments,
       financialRecords,

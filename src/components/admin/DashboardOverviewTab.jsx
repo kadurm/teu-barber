@@ -325,9 +325,18 @@ export default function DashboardOverviewTab({ onNavigateTab, onOpenNewAppointme
 
           {/* Quick Barbers Comparison */}
           <div className="pt-4 border-t border-white/10 space-y-2">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-              Equipe do Estúdio
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Equipe & Parceiros
+              </span>
+              <button
+                onClick={() => onNavigateTab('partners')}
+                className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+              >
+                <span>Ver Comissões</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {barbersPerformance.map(b => (
                 <div key={b.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">

@@ -13,10 +13,12 @@ import {
   ArrowLeft,
   LogOut,
   Menu,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import DashboardOverviewTab from './DashboardOverviewTab';
 import AppointmentsTab from './AppointmentsTab';
+import PartnersTab from './PartnersTab';
 import ScheduleTab from './ScheduleTab';
 import FinancialTab from './FinancialTab';
 import AcquisitionsTab from './AcquisitionsTab';
@@ -35,6 +37,7 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
     { id: 'appointments', label: 'Agenda & Atendimentos', icon: Calendar, badge: pendingCount > 0 ? pendingCount : null },
+    { id: 'partners', label: 'Parceiros & Comissões', icon: Users },
     { id: 'schedule', label: 'Horários & Expediente', icon: Clock },
     { id: 'financial', label: 'Financeiro & Caixa', icon: DollarSign },
     { id: 'acquisitions', label: 'Melhoria do Espaço', icon: Target },
@@ -289,6 +292,7 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
               />
             )}
             {activeAdminTab === 'appointments' && <AppointmentsTab />}
+            {activeAdminTab === 'partners' && <PartnersTab />}
             {activeAdminTab === 'schedule' && <ScheduleTab />}
             {activeAdminTab === 'financial' && <FinancialTab />}
             {activeAdminTab === 'acquisitions' && <AcquisitionsTab />}

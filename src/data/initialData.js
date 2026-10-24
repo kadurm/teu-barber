@@ -26,24 +26,34 @@ export const BARBERS = [
     id: "user1",
     name: "Teu",
     role: "Barbeiro & Proprietário",
+    phone: "(38) 99121-8119",
+    document: "084.921.346-12",
+    pixKey: "38991218119",
+    pixKeyType: "Telefone",
+    admissionDate: "2023-01-15",
     avatar: logoImg,
     rating: "4.9",
     totalReviews: 248,
     specialty: "Cortes Modernos, Degradê Navalhado, Platinados & Barboterapia",
     bio: "Especialista em visagismo e cortes de alta precisão. Atendimento exclusivo focado na experiência do cliente.",
-    commissionRate: 100, // Dono fica com 100% ou controla caixa
+    commissionRate: 100, // Dono fica com 100% da sua produção
     active: true
   },
   {
     id: "user2",
     name: "Gustavo",
     role: "Barbeiro Profissional",
+    phone: "(38) 99876-5432",
+    document: "112.345.678-90",
+    pixKey: "gustavo.barber.moc@gmail.com",
+    pixKeyType: "E-mail",
+    admissionDate: "2024-03-01",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
     rating: "4.8",
     totalReviews: 184,
     specialty: "Corte Clássico, Barba Modelada, Pigmentação & Selagem",
     bio: "Mestre nos detalhes e alinhamentos de barba e degrade. Pontualidade e precisão técnica.",
-    commissionRate: 50, // 50% comissão padrão
+    commissionRate: 50, // 50% de comissão padrão para o parceiro
     active: true
   }
 ];
