@@ -100,13 +100,13 @@ export default function ClientBooking() {
     );
 
     return allSlots.map(time => {
-      const available = isSlotAvailable(selectedDate, time, selectedBarberId);
+      const available = isSlotAvailable(selectedDate, time, selectedBarberId, selectedService?.duration);
       return {
         time,
         available
       };
     });
-  }, [shopInfo, selectedDate, selectedBarberId, isSlotAvailable]);
+  }, [shopInfo, selectedDate, selectedBarberId, selectedService, isSlotAvailable]);
 
   // Phone input mask handler
   const handlePhoneChange = (e) => {
@@ -526,14 +526,20 @@ export default function ClientBooking() {
 
           {/* Time Slots Grid */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
                 Horários Livres para {formatDateBR(selectedDate)}:
               </label>
-              <span className="text-[11px] text-slate-400">
-                Intervalo: {shopInfo.slotDurationMinutes} minutos
-              </span>
+              <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-400">
+                {selectedService && (
+                  <span className="text-amber-400/90 font-medium">
+                    Tempo do serviço: {selectedService.duration} min
+                  </span>
+                )}
+                <span>•</span>
+                <span>Intervalo: {shopInfo.slotDurationMinutes} min</span>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">

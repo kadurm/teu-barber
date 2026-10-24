@@ -255,20 +255,85 @@ export function AppProvider({ children }) {
     setServices(prev => prev.filter(s => s.id !== id));
   };
 
-  // Check if slot is available
-  const isSlotAvailable = (date, time, barberId) => {
-    // Check if slot is blocked
-    const isBlocked = blockedSlots.some(b => b.date === date && b.time === time && (b.barberId === barberId || b.barberId === 'all'));
+  // Helper to convert HH:MM to minutes from midnight
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  // Helper to get duration of an appointment in minutes
+  const getAppointmentDuration = (apt) => {
+    if (apt.duration && !isNaN(Number(apt.duration)) && Number(apt.duration) > 0) {
+      return Number(apt.duration);
+    }
+    if (apt.serviceId) {
+      const s = services.find(srv => srv.id === apt.serviceId);
+      if (s && s.duration) return Number(s.duration);
+    }
+    return Number(shopInfo?.slotDurationMinutes || 30);
+  };
+
+  // Check if slot is available considering service durations and overlapping intervals
+  const isSlotAvailable = (date, time, barberId, requestedDuration = null) => {
+    const slotDuration = Number(shopInfo?.slotDurationMinutes || 30);
+    const durationNeeded = requestedDuration ? Number(requestedDuration) : slotDuration;
+    const slotStart = timeToMinutes(time);
+    const slotEnd = slotStart + durationNeeded;
+
+    // 1. Check operating hours for date
+    let closeTimeStr = shopInfo?.closeTime || "20:00";
+    let openTimeStr = shopInfo?.openTime || "09:00";
+    if (date) {
+      const [year, month, day] = date.split('-').map(Number);
+      const dayOfWeek = new Date(year, month - 1, day).getDay();
+      if (dayOfWeek === 6) { // Saturday
+        closeTimeStr = shopInfo?.saturdayCloseTime || "18:00";
+        openTimeStr = shopInfo?.saturdayOpenTime || "09:00";
+      }
+    }
+    const closeMinutes = timeToMinutes(closeTimeStr);
+    const openMinutes = timeToMinutes(openTimeStr);
+
+    if (slotStart < openMinutes || slotEnd > closeMinutes) {
+      return false;
+    }
+
+    // 2. Check lunch interval
+    if (shopInfo?.lunchStart && shopInfo?.lunchEnd) {
+      const lunchStartMin = timeToMinutes(shopInfo.lunchStart);
+      const lunchEndMin = timeToMinutes(shopInfo.lunchEnd);
+      if (lunchEndMin > lunchStartMin) {
+        if (slotStart < lunchEndMin && lunchStartMin < slotEnd) {
+          return false;
+        }
+      }
+    }
+
+    // 3. Check if slot is blocked
+    const isBlocked = blockedSlots.some(b => {
+      if (b.date !== date) return false;
+      if (b.barberId !== barberId && b.barberId !== 'all') return false;
+      const blockStart = timeToMinutes(b.time);
+      const blockEnd = blockStart + slotDuration;
+      return slotStart < blockEnd && blockStart < slotEnd;
+    });
     if (isBlocked) return false;
 
-    // Check if already booked with active appointment
-    const isBooked = appointments.some(apt => 
-      apt.date === date && 
-      apt.time === time && 
-      apt.barberId === barberId && 
-      apt.status !== 'cancelado'
-    );
-    return !isBooked;
+    // 4. Check if overlaps with any active appointment taking its duration into account
+    const hasConflict = appointments.some(apt => {
+      if (apt.date !== date) return false;
+      if (apt.barberId !== barberId) return false;
+      if (apt.status === 'cancelado') return false;
+
+      const aptStart = timeToMinutes(apt.time);
+      const aptDuration = getAppointmentDuration(apt);
+      const aptEnd = aptStart + aptDuration;
+
+      return slotStart < aptEnd && aptStart < slotEnd;
+    });
+
+    return !hasConflict;
   };
 
   // Reset to initial data
@@ -347,6 +412,8 @@ export function AppProvider({ children }) {
       updateService,
       deleteService,
       isSlotAvailable,
+      timeToMinutes,
+      getAppointmentDuration,
       resetToInitialData,
       exportData,
       importData

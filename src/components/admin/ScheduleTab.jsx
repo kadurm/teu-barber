@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function ScheduleTab() {
-  const { shopInfo, setShopInfo, barbers, blockedSlots, toggleBlockedSlot, isSlotAvailable } = useApp();
+  const { shopInfo, setShopInfo, barbers, appointments, blockedSlots, toggleBlockedSlot, isSlotAvailable, timeToMinutes, getAppointmentDuration } = useApp();
 
   const [selectedBarberId, setSelectedBarberId] = useState('user1');
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -127,10 +127,28 @@ export default function ScheduleTab() {
               const isBlocked = blockedSlots.some(b => b.date === selectedDate && b.time === time && b.barberId === selectedBarberId);
               const available = isSlotAvailable(selectedDate, time, selectedBarberId);
 
+              // Find appointment occupying this slot if any
+              const occupyingApt = (!available && !isBlocked && appointments) ? appointments.find(apt => {
+                if (apt.date !== selectedDate || apt.barberId !== selectedBarberId || apt.status === 'cancelado') return false;
+                const aptStart = timeToMinutes(apt.time);
+                const aptDuration = getAppointmentDuration ? getAppointmentDuration(apt) : (Number(apt.duration) || 30);
+                const aptEnd = aptStart + aptDuration;
+                const slotStart = timeToMinutes(time);
+                const slotEnd = slotStart + Number(shopInfo.slotDurationMinutes || 30);
+                return slotStart < aptEnd && aptStart < slotEnd;
+              }) : null;
+
               return (
                 <button
                   key={time}
                   onClick={() => toggleBlockedSlot(selectedDate, time, selectedBarberId, "Bloqueado pelo barbeiro")}
+                  title={
+                    isBlocked
+                      ? 'Horário bloqueado manualmente'
+                      : occupyingApt
+                      ? `Agendado: ${occupyingApt.clientName} (${occupyingApt.serviceName} • ${occupyingApt.duration || 30} min)`
+                      : 'Disponível para agendamento'
+                  }
                   className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                     isBlocked
                       ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
