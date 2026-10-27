@@ -158,10 +158,8 @@ export default function ClientBooking() {
     if (value.length >= 10) {
       const found = getClientByPhone(value);
       if (found) {
-        if (!clientName.trim() || clientName === '') {
-          setClientName(found.name);
-        }
-        if (!notes && found.notes) {
+        setClientName(found.name);
+        if (found.notes) {
           setNotes(found.notes);
         }
         setAutoRecognizedClient(found);
@@ -170,6 +168,17 @@ export default function ClientBooking() {
       }
     } else {
       setAutoRecognizedClient(null);
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    if (clientPhone.length >= 10) {
+      const found = getClientByPhone(clientPhone);
+      if (found) {
+        setClientName(found.name);
+        if (found.notes) setNotes(found.notes);
+        setAutoRecognizedClient(found);
+      }
     }
   };
 
@@ -723,58 +732,13 @@ export default function ClientBooking() {
             </div>
           </div>
 
-          {/* Recognized User Notification */}
-          {autoRecognizedClient && (
-            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-fadeIn">
-              <div className="flex items-center gap-2.5 text-emerald-400 font-semibold">
-                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center font-black text-xs text-emerald-400 shrink-0">
-                  ✓
-                </div>
-                <div>
-                  <span className="block font-bold text-white">Usuário identificado pelo WhatsApp!</span>
-                  <span className="text-[11px] text-zinc-400">
-                    Olá de volta, <strong>{autoRecognizedClient.name}</strong>. Seus dados foram preenchidos automaticamente.
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setClientPhone('');
-                  setClientName('');
-                  setAutoRecognizedClient(null);
-                  logoutClient();
-                }}
-                className="text-[11px] text-zinc-400 hover:text-white underline font-medium cursor-pointer shrink-0 ml-2"
-              >
-                Trocar número
-              </button>
-            </div>
-          )}
-
-          {/* Form Fields */}
+          {/* Form Fields - Telefone primeiro para identificação imediata */}
           <div className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Seu Nome Completo *
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: João Silva"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full bg-slate-900 border border-white/15 text-slate-100 text-sm pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-
+            {/* 1. Celular / WhatsApp */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
-                  Seu Celular / WhatsApp (Chave de Acesso) *
+                  1. Seu Celular / WhatsApp (Identificação) *
                 </label>
                 {currentClientPhone && (
                   <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
@@ -790,12 +754,60 @@ export default function ClientBooking() {
                   placeholder="(38) 99999-9999"
                   value={formatPhone(clientPhone)}
                   onChange={handlePhoneChange}
-                  className="w-full bg-slate-900 border border-white/15 text-slate-100 text-sm pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:border-amber-400"
+                  onBlur={handlePhoneBlur}
+                  className="w-full bg-slate-900 border border-white/15 text-slate-100 text-sm pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:border-amber-400 font-medium"
                 />
               </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                O WhatsApp é a sua chave exclusiva. Seu usuário é salvo automaticamente no primeiro agendamento e você receberá o lembrete 2h antes!
+                Ao digitar seu número, seus dados de cliente serão identificados e preenchidos automaticamente.
               </span>
+            </div>
+
+            {/* Recognized User Notification */}
+            {autoRecognizedClient && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-fadeIn">
+                <div className="flex items-center gap-2.5 text-emerald-400 font-semibold">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center font-black text-xs text-emerald-400 shrink-0">
+                    ✓
+                  </div>
+                  <div>
+                    <span className="block font-bold text-white">Cliente Identificado com Sucesso!</span>
+                    <span className="text-[11px] text-emerald-300">
+                      Olá, <strong>{autoRecognizedClient.name}</strong>! Seus dados foram preenchidos automaticamente.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientPhone('');
+                    setClientName('');
+                    setAutoRecognizedClient(null);
+                    logoutClient();
+                  }}
+                  className="text-[11px] text-zinc-400 hover:text-white underline font-medium cursor-pointer shrink-0 ml-2"
+                >
+                  Trocar número
+                </button>
+              </div>
+            )}
+
+            {/* 2. Nome Completo */}
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
+                2. Seu Nome Completo *
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: João Silva"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  className="w-full bg-slate-900 border border-white/15 text-slate-100 text-sm pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:border-amber-400"
+                />
+              </div>
             </div>
 
             <div>

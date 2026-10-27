@@ -13,6 +13,7 @@ import {
   Smartphone,
   CheckCircle2,
   Lock,
+  Trash2,
   X
 } from 'lucide-react';
 
@@ -23,18 +24,72 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
     (typeof window !== 'undefined' && !!window.ApplePaySession)
   );
 
+  const cleanPhone = (booking?.clientPhone || '').replace(/\D/g, '');
   const [paymentType, setPaymentType] = useState(initialPaymentType || 'wallet'); // 'wallet', 'pix', 'card'
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes timer
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
 
+  // Saved cards for client phone / device
+  const [savedCards, setSavedCards] = useState([]);
+  const [saveCardForFuture, setSaveCardForFuture] = useState(true);
+
   // Card form state
   const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState(booking.clientName || '');
+  const [cardHolder, setCardHolder] = useState(booking?.clientName || '');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [installments, setInstallments] = useState('1');
+
+  // Load saved cards for this client & device
+  useEffect(() => {
+    try {
+      let cards = [];
+      if (cleanPhone) {
+        const storedByPhone = localStorage.getItem(`teu_saved_cards_${cleanPhone}`);
+        if (storedByPhone) {
+          const parsed = JSON.parse(storedByPhone);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cards = parsed;
+          }
+        }
+      }
+      if (cards.length === 0) {
+        const storedGlobal = localStorage.getItem('teu_saved_cards');
+        if (storedGlobal) {
+          const parsed = JSON.parse(storedGlobal);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cards = parsed;
+          }
+        }
+      }
+      if (cards.length > 0) {
+        setSavedCards(cards);
+      }
+    } catch (e) {
+      console.warn('Falha ao carregar cartões salvos:', e);
+    }
+  }, [cleanPhone]);
+
+  const handleDeleteSavedCard = (cardId, e) => {
+    e?.stopPropagation();
+    const updated = savedCards.filter(c => c.id !== cardId);
+    setSavedCards(updated);
+    if (cleanPhone) {
+      localStorage.setItem(`teu_saved_cards_${cleanPhone}`, JSON.stringify(updated));
+    }
+    localStorage.setItem('teu_saved_cards', JSON.stringify(updated));
+  };
+
+  const handlePayWithSavedCard = (card) => {
+    setIsProcessing(true);
+    setProcessingStatus(`Debitando no cartão final ${card.last4}...`);
+    setTimeout(() => {
+      setIsProcessing(false);
+      onPaymentConfirmed(`Cartão Salvo •••• ${card.last4} (1-Toque)`);
+    }, 1300);
+  };
 
   // Simulated unique Pix Copia e Cola payload
   const bookingCode = (booking?.id || `TB-${Date.now().toString().slice(-5)}`).toLowerCase();
@@ -111,10 +166,33 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
   const handleSimulateCardPayment = (e) => {
     e.preventDefault();
     setIsProcessing(true);
+
+    const cleanCard = cardNumber.replace(/\D/g, '');
+    if (saveCardForFuture && cleanCard.length >= 13) {
+      try {
+        const last4 = cleanCard.slice(-4);
+        const newCard = {
+          id: Date.now().toString(),
+          brand: 'Cartão de Crédito',
+          last4,
+          holder: cardHolder || booking?.clientName || 'Cliente',
+          expiry: cardExpiry
+        };
+        const updated = [newCard, ...savedCards.filter(c => c.last4 !== last4)];
+        setSavedCards(updated);
+        if (cleanPhone) {
+          localStorage.setItem(`teu_saved_cards_${cleanPhone}`, JSON.stringify(updated));
+        }
+        localStorage.setItem('teu_saved_cards', JSON.stringify(updated));
+      } catch (err) {
+        // ignore
+      }
+    }
+
     setTimeout(() => {
       setIsProcessing(false);
       onPaymentConfirmed('Mercado Pago (Cartão Online)');
-    }, 1800);
+    }, 1600);
   };
 
   const handleSimulatePixPaid = () => {
@@ -369,88 +447,162 @@ export default function MercadoPagoCheckout({ booking, shopInfo, initialPaymentT
 
       {/* ================= 3. CREDIT CARD VIEW ================= */}
       {paymentType === 'card' && (
-        <form onSubmit={handleSimulateCardPayment} className="space-y-3 animate-fadeIn text-xs">
-          <div>
-            <label className="text-slate-300 font-semibold block mb-1">Número do Cartão</label>
-            <input
-              type="text"
-              required
-              placeholder="0000 0000 0000 0000"
-              value={cardNumber}
-              onChange={e => setCardNumber(e.target.value)}
-              className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white font-mono focus:outline-none focus:border-sky-400"
-            />
-          </div>
+        <div className="space-y-4 animate-fadeIn text-xs">
+          {/* Saved Cards List (1-Click Payment) */}
+          {savedCards.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/30 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-sky-400 mb-1">
+                <span className="flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4" /> Cartões Salvos no seu Aparelho
+                </span>
+                <span className="text-[10px] bg-sky-500/20 px-2 py-0.5 rounded-full border border-sky-500/30 font-semibold">
+                  1-Toque
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                {savedCards.map(card => (
+                  <div
+                    key={card.id}
+                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 flex items-center justify-between gap-3 transition-all"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-lg bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-xs shrink-0">
+                        💳
+                      </div>
+                      <div>
+                        <span className="font-mono font-bold text-white text-xs block">
+                          •••• •••• •••• {card.last4}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {card.holder} {card.expiry ? `• Val: ${card.expiry}` : ''}
+                        </span>
+                      </div>
+                    </div>
 
-          <div>
-            <label className="text-slate-300 font-semibold block mb-1">Nome Impresso no Cartão</label>
-            <input
-              type="text"
-              required
-              placeholder="Como aparece no cartão"
-              value={cardHolder}
-              onChange={e => setCardHolder(e.target.value)}
-              className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white uppercase focus:outline-none focus:border-sky-400"
-            />
-          </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => handlePayWithSavedCard(card)}
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-300 hover:to-sky-400 text-slate-950 font-bold text-xs shadow-md shadow-sky-500/20 flex items-center gap-1 cursor-pointer transition-all hover:scale-105"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Pagar 1-Toque
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSavedCard(card.id, e)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Excluir cartão"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
+              <div className="pt-1 text-[11px] text-slate-400 text-center border-t border-white/5 mt-2">
+                Ou preencha um novo cartão abaixo:
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSimulateCardPayment} className="space-y-3">
             <div>
-              <label className="text-slate-300 font-semibold block mb-1">Validade (MM/AA)</label>
+              <label className="text-slate-300 font-semibold block mb-1">Número do Cartão</label>
               <input
                 type="text"
                 required
-                placeholder="MM/AA"
-                value={cardExpiry}
-                onChange={e => setCardExpiry(e.target.value)}
+                placeholder="0000 0000 0000 0000"
+                value={cardNumber}
+                onChange={e => setCardNumber(e.target.value)}
                 className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white font-mono focus:outline-none focus:border-sky-400"
               />
             </div>
 
             <div>
-              <label className="text-slate-300 font-semibold block mb-1">CVV / CVC</label>
+              <label className="text-slate-300 font-semibold block mb-1">Nome Impresso no Cartão</label>
               <input
-                type="password"
+                type="text"
                 required
-                maxLength={4}
-                placeholder="123"
-                value={cardCvv}
-                onChange={e => setCardCvv(e.target.value)}
-                className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white font-mono focus:outline-none focus:border-sky-400"
+                placeholder="Como aparece no cartão"
+                value={cardHolder}
+                onChange={e => setCardHolder(e.target.value)}
+                className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white uppercase focus:outline-none focus:border-sky-400"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="text-slate-300 font-semibold block mb-1">Parcelamento</label>
-            <select
-              value={installments}
-              onChange={e => setInstallments(e.target.value)}
-              className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white focus:outline-none focus:border-sky-400"
-            >
-              <option value="1">1x de {formatCurrency(booking.price)} sem juros</option>
-              <option value="2">2x de {formatCurrency(booking.price / 2)} sem juros</option>
-              <option value="3">3x de {formatCurrency(booking.price / 3)} sem juros</option>
-            </select>
-          </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Validade (MM/AA)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="MM/AA"
+                  value={cardExpiry}
+                  onChange={e => setCardExpiry(e.target.value)}
+                  className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white font-mono focus:outline-none focus:border-sky-400"
+                />
+              </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="w-full py-3.5 rounded-xl bg-[#009ee3] hover:bg-sky-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 transition-all cursor-pointer"
-            >
-              {isProcessing ? (
-                <span>Processando pagamento...</span>
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Pagar {formatCurrency(booking.price)}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">CVV / CVC</label>
+                <input
+                  type="password"
+                  required
+                  maxLength={4}
+                  placeholder="123"
+                  value={cardCvv}
+                  onChange={e => setCardCvv(e.target.value)}
+                  className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white font-mono focus:outline-none focus:border-sky-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-semibold block mb-1">Parcelamento</label>
+              <select
+                value={installments}
+                onChange={e => setInstallments(e.target.value)}
+                className="w-full bg-slate-900 border border-white/15 px-3 py-2.5 rounded-xl text-white focus:outline-none focus:border-sky-400"
+              >
+                <option value="1">1x de {formatCurrency(booking.price)} sem juros</option>
+                <option value="2">2x de {formatCurrency(booking.price / 2)} sem juros</option>
+                <option value="3">3x de {formatCurrency(booking.price / 3)} sem juros</option>
+              </select>
+            </div>
+
+            <div className="pt-1">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={saveCardForFuture}
+                  onChange={e => setSaveCardForFuture(e.target.checked)}
+                  className="rounded border-white/20 bg-slate-900 text-sky-500 focus:ring-0 cursor-pointer"
+                />
+                <span className="text-[11px]">Salvar este cartão de forma segura no dispositivo para próximos agendamentos (1-Toque)</span>
+              </label>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className="w-full py-3.5 rounded-xl bg-[#009ee3] hover:bg-sky-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 transition-all cursor-pointer"
+              >
+                {isProcessing ? (
+                  <span>Processando pagamento...</span>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Pagar {formatCurrency(booking.price)}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
     </div>

@@ -215,18 +215,28 @@ export function AppProvider({ children }) {
     }
   }, [currentClientPhone]);
 
-  // Client Management Functions
+  // Client Management Functions & Phone Normalizer
+  const normalizePhone = (phone) => {
+    if (!phone) return '';
+    let clean = phone.toString().replace(/\D/g, '');
+    if (clean.startsWith('55') && clean.length >= 12) {
+      clean = clean.slice(2);
+    }
+    return clean;
+  };
+
   const saveClientProfile = (phone, name, notes = '') => {
-    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const cleanPhone = normalizePhone(phone);
     if (!cleanPhone) return null;
 
     let updatedClient = null;
     setClients(prev => {
-      const existingIdx = prev.findIndex(c => c.phone === cleanPhone);
+      const existingIdx = prev.findIndex(c => normalizePhone(c.phone) === cleanPhone);
       if (existingIdx >= 0) {
         const existing = prev[existingIdx];
         updatedClient = {
           ...existing,
+          phone: cleanPhone,
           name: name.trim() || existing.name,
           notes: notes !== undefined ? notes.trim() : existing.notes,
           updatedAt: new Date().toISOString()
@@ -238,13 +248,19 @@ export function AppProvider({ children }) {
         updatedClient = {
           phone: cleanPhone,
           name: name.trim(),
-          notes: notes.trim(),
+          notes: notes ? notes.trim() : '',
           createdAt: new Date().toISOString(),
           totalBookings: 1
         };
         return [updatedClient, ...prev];
       }
     });
+
+    try {
+      localStorage.setItem(`teu_barber_client_${cleanPhone}`, JSON.stringify(updatedClient));
+    } catch (e) {
+      // ignore
+    }
 
     if (isFirebaseConfigured() && updatedClient) {
       saveFirestoreDoc('clients', cleanPhone, updatedClient);
@@ -255,9 +271,36 @@ export function AppProvider({ children }) {
   };
 
   const getClientByPhone = (phone) => {
-    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-    if (!cleanPhone) return null;
-    return clients.find(c => c.phone === cleanPhone) || null;
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.length < 10) return null;
+
+    // 1. Busca na lista de clientes cadastrados
+    const foundInClients = clients.find(c => normalizePhone(c.phone) === cleanPhone);
+    if (foundInClients) return foundInClients;
+
+    // 2. Busca no histórico de agendamentos se já agendou alguma vez
+    const foundInApts = appointments.find(apt => normalizePhone(apt.clientPhone) === cleanPhone && apt.clientName);
+    if (foundInApts) {
+      return {
+        phone: cleanPhone,
+        name: foundInApts.clientName,
+        notes: foundInApts.notes || '',
+        totalBookings: appointments.filter(a => normalizePhone(a.clientPhone) === cleanPhone).length || 1,
+        source: 'appointments'
+      };
+    }
+
+    // 3. Busca no cache local do dispositivo
+    try {
+      const cached = localStorage.getItem(`teu_barber_client_${cleanPhone}`);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return null;
   };
 
   const logoutClient = () => {
