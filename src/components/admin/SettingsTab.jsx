@@ -7,21 +7,16 @@ import {
   Store,
   Users,
   Download,
-  Upload,
-  RotateCcw,
   Plus,
   Trash2,
   CheckCircle2,
   Edit2,
   Layers,
-  Filter,
-  Flame,
-  Cloud,
-  Database
+  Filter
 } from 'lucide-react';
 import EditServiceModal from './EditServiceModal';
 
-export default function SettingsTab({ onOpenFirebaseModal }) {
+export default function SettingsTab() {
   const {
     shopInfo,
     setShopInfo,
@@ -31,10 +26,7 @@ export default function SettingsTab({ onOpenFirebaseModal }) {
     deleteService,
     barbers,
     setBarbers,
-    exportData,
-    importData,
-    resetToInitialData,
-    cloudConnected
+    exportData
   } = useApp();
 
   // New Service Form State
@@ -53,9 +45,6 @@ export default function SettingsTab({ onOpenFirebaseModal }) {
   const [shopAddress, setShopAddress] = useState(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
   const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.studio');
   const [shopSavedSuccess, setShopSavedSuccess] = useState(false);
-
-  // File input ref for import
-  const fileInputRef = React.useRef(null);
 
   const handleAddService = (e) => {
     e.preventDefault();
@@ -100,17 +89,6 @@ export default function SettingsTab({ onOpenFirebaseModal }) {
     }));
     setShopSavedSuccess(true);
     setTimeout(() => setShopSavedSuccess(false), 3000);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      importData(event.target.result);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   return (
@@ -441,44 +419,7 @@ export default function SettingsTab({ onOpenFirebaseModal }) {
         </div>
       </form>
 
-      {/* Part 3: Firebase Cloud Firestore Database */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-400" />
-              Banco de Dados em Nuvem (Firebase Firestore)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Sincronização em tempo real dos agendamentos, clientes e catálogo entre múltiplos dispositivos via projeto Firebase &quot;TeuBarber&quot;.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
-              cloudConnected
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${cloudConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-              {cloudConnected ? 'Conectado à Nuvem' : 'Pendente de Configuração'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <button
-            type="button"
-            onClick={onOpenFirebaseModal}
-            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-          >
-            <Flame className="w-4 h-4 fill-slate-950" />
-            <span>{cloudConnected ? 'Gerenciar Conexão Firebase' : 'Configurar Projeto TeuBarber'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Part 4: Data Backup, Import & Factory Reset */}
+      {/* Part 3: Data Backup */}
       <div className="p-5 sm:p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -498,31 +439,6 @@ export default function SettingsTab({ onOpenFirebaseModal }) {
           >
             <Download className="w-4 h-4 text-emerald-400" />
             <span>Exportar Backup (JSON)</span>
-          </button>
-
-          {/* Import Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all"
-          >
-            <Upload className="w-4 h-4 text-blue-400" />
-            <span>Restaurar / Importar Backup</span>
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            className="hidden"
-          />
-
-          {/* Reset Defaults Button */}
-          <button
-            onClick={resetToInitialData}
-            className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2 transition-all"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Redefinir Padrões do Teu Barber</span>
           </button>
         </div>
       </div>

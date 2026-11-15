@@ -33,6 +33,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
     setCurrentClientPhone,
     saveClientProfile,
     getClientByPhone,
+    lookupClientByPhone,
     logoutClient,
     appointments,
     updateAppointmentStatus
@@ -82,7 +83,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
 
   if (!isOpen) return null;
 
-  const handlePhoneLookup = (e) => {
+  const handlePhoneLookup = async (e) => {
     e.preventDefault();
     const clean = inputPhone.replace(/\D/g, '');
     if (clean.length < 10) {
@@ -90,7 +91,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
       return;
     }
 
-    const found = getClientByPhone(clean);
+    const found = await lookupClientByPhone(clean);
     if (found) {
       setCurrentClientPhone(clean);
       setSearchError('');

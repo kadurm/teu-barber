@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   formatCurrency,
@@ -52,6 +52,7 @@ export default function ClientBooking() {
     clients,
     currentClientPhone,
     getClientByPhone,
+    lookupClientByPhone,
     logoutClient
   } = useApp();
 
@@ -148,6 +149,21 @@ export default function ClientBooking() {
     }
   }, [currentClientPhone]);
 
+  // Busca local + nuvem (leitura por ID); ignora respostas de números já alterados
+  const latestLookupRef = useRef('');
+  const applyLookup = async (phone) => {
+    latestLookupRef.current = phone;
+    const found = await lookupClientByPhone(phone);
+    if (latestLookupRef.current !== phone) return;
+    if (found) {
+      setClientName(found.name);
+      if (found.notes) setNotes(found.notes);
+      setAutoRecognizedClient(found);
+    } else {
+      setAutoRecognizedClient(null);
+    }
+  };
+
   // Phone input mask handler + auto lookup by WhatsApp number
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -156,29 +172,16 @@ export default function ClientBooking() {
 
     // Auto lookup user by WhatsApp
     if (value.length >= 10) {
-      const found = getClientByPhone(value);
-      if (found) {
-        setClientName(found.name);
-        if (found.notes) {
-          setNotes(found.notes);
-        }
-        setAutoRecognizedClient(found);
-      } else {
-        setAutoRecognizedClient(null);
-      }
+      applyLookup(value);
     } else {
+      latestLookupRef.current = '';
       setAutoRecognizedClient(null);
     }
   };
 
   const handlePhoneBlur = () => {
-    if (clientPhone.length >= 10) {
-      const found = getClientByPhone(clientPhone);
-      if (found) {
-        setClientName(found.name);
-        if (found.notes) setNotes(found.notes);
-        setAutoRecognizedClient(found);
-      }
+    if (clientPhone.length >= 10 && !autoRecognizedClient) {
+      applyLookup(clientPhone);
     }
   };
 

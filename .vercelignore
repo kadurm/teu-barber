@@ -1,0 +1,6 @@
+# Variáveis locais: na Vercel as VITE_FIREBASE_* vêm das Environment Variables do projeto
+.env
+.env.*
+!.env.example
+node_modules
+dist

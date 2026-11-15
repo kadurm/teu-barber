@@ -1,55 +1,74 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  getDocs 
+﻿import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  limit,
+  getDocs,
+  getDocsFromServer
 } from 'firebase/firestore';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
+} from 'firebase/auth';
 
-// Regras recomendadas para o Firestore do Teu Barber Studio
-export const FIRESTORE_RULES_GUIDE = `rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Permite leitura e escrita das coleções operacionais da barbearia
-    match /appointments/{docId} {
-      allow read, write: if true;
-    }
-    match /clients/{docId} {
-      allow read, write: if true;
-    }
-    match /barbers/{docId} {
-      allow read, write: if true;
-    }
-    match /services/{docId} {
-      allow read, write: if true;
-    }
-    match /financial/{docId} {
-      allow read, write: if true;
-    }
-    match /settings/{docId} {
-      allow read, write: if true;
-    }
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}`;
+// Login por nome de usuário: "TeuAdmin" -> "teuadmin@teubarber.app" (e-mail interno, não precisa existir).
+// Se o valor já contiver "@", é usado como e-mail normal.
+export const ADMIN_EMAIL_DOMAIN = 'teubarber.app';
+export const usernameToEmail = (username) => {
+  const value = String(username || '').trim();
+  if (value.includes('@')) return value.toLowerCase();
+  const slug = value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  return slug ? `${slug}@${ADMIN_EMAIL_DOMAIN}` : '';
+};
+export const emailToUsername = (email) => {
+  const value = String(email || '');
+  return value.endsWith(`@${ADMIN_EMAIL_DOMAIN}`) ? value.split('@')[0] : value;
+};
 
-// Recupera a configuração do Firebase das variáveis Vite ou do localStorage
+// Campos sensíveis do barbeiro: ficam em /barbers_private (somente admin)
+export const PRIVATE_BARBER_FIELDS = ['document', 'pixKey', 'pixKeyType', 'commissionRate', 'phone'];
+
+export const splitBarberData = (barber) => {
+  const publicData = {};
+  const privateData = {};
+  Object.entries(barber || {}).forEach(([key, value]) => {
+    if (PRIVATE_BARBER_FIELDS.includes(key)) privateData[key] = value;
+    else publicData[key] = value;
+  });
+  return { publicData, privateData };
+};
+
+// ID determinístico do horário ocupado (impede sobrescrita pelo público)
+export const getSlotId = (barberId, date, time) =>
+  `${barberId}_${date}_${String(time || '').replace(':', '')}`;
+
+// Recupera a configuração do Firebase: variáveis de build (VITE_) têm prioridade;
+// o localStorage só é usado como fallback quando o build não traz credenciais.
 export const getFirebaseConfig = () => {
   const envConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'teubarber',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'teubarber-c38cc',
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
     appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
   };
+
+  if (envConfig.apiKey && envConfig.projectId) {
+    return envConfig;
+  }
 
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('teu_barber_firebase_config');
@@ -167,13 +186,8 @@ export const testFirebaseConnection = async (customConfig = null) => {
     }
 
     const db = getFirestore(app);
-    // Tenta gravar um documento leve de ping de teste
-    const testDocRef = doc(db, 'system_test', 'ping');
-    await setDoc(testDocRef, {
-      status: 'online',
-      appName: 'Teu Barber Studio',
-      timestamp: new Date().toISOString()
-    });
+    // Teste somente leitura em coleção pública (não exige login de admin)
+    await getDocs(query(collection(db, 'services'), limit(1)));
 
     return { 
       success: true, 
@@ -218,14 +232,143 @@ export const subscribeToCollection = (collectionName, onUpdate, onError) => {
   }
 };
 
+// Lê um único documento (usado pelo cliente para buscar o próprio cadastro pelo telefone)
+// Verifica no SERVIDOR (nunca no cache) se a coleção está vazia.
+// Retorna null em caso de erro, para quem chama não tratar falha como "vazia".
+export const isCollectionEmptyOnServer = async (collectionName) => {
+  const db = getFirestoreDb();
+  if (!db) return null;
+  try {
+    const snap = await getDocsFromServer(query(collection(db, collectionName), limit(1)));
+    return snap.empty;
+  } catch (err) {
+    console.warn(`Erro ao verificar ${collectionName}:`, err);
+    return null;
+  }
+};
+
+export const getFirestoreDocOnce = async (collectionName, docId) => {
+  const db = getFirestoreDb();
+  if (!db || !docId) return null;
+  try {
+    const snap = await getDoc(doc(db, collectionName, String(docId)));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (err) {
+    console.warn(`Erro ao ler ${collectionName}/${docId}:`, err);
+    return null;
+  }
+};
+
+// ---------- Autenticação do painel administrativo ----------
+export const getFirebaseAuth = () => {
+  const app = getFirebaseApp();
+  return app ? getAuth(app) : null;
+};
+
+export const adminSignIn = async (usernameOrEmail, password) => {
+  const auth = getFirebaseAuth();
+  if (!auth) throw new Error('firebase-not-configured');
+  const email = usernameToEmail(usernameOrEmail);
+  if (!email) throw new Error('auth/invalid-email');
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  const isAdmin = await checkIsAdmin(cred.user.uid);
+  if (!isAdmin) {
+    await signOut(auth);
+    throw new Error('not-admin');
+  }
+  return cred.user;
+};
+
+export const adminSignOut = async () => {
+  const auth = getFirebaseAuth();
+  if (auth) await signOut(auth);
+};
+
+// Admin = existe o documento /admins/{uid} (criado manualmente no console do Firebase)
+export const checkIsAdmin = async (uid) => {
+  const db = getFirestoreDb();
+  if (!db || !uid) return false;
+  try {
+    const snap = await getDoc(doc(db, 'admins', uid));
+    return snap.exists();
+  } catch (err) {
+    console.warn('Falha ao verificar permissão de admin:', err);
+    return false;
+  }
+};
+
+// ---------- Gestão de usuários do painel (executado por um admin logado) ----------
+
+// Cria o login numa instância secundária do Firebase para NÃO deslogar o admin atual,
+// depois libera o acesso gravando /admins/{uid}.
+export const createAdminUser = async ({ username, password, name }) => {
+  const db = getFirestoreDb();
+  const currentAuth = getFirebaseAuth();
+  if (!db || !currentAuth?.currentUser) throw new Error('not-admin');
+
+  const email = usernameToEmail(username);
+  if (!email) throw new Error('auth/invalid-email');
+
+  const secondaryName = 'admin-user-creator';
+  const secondaryApp = getApps().find(a => a.name === secondaryName)
+    || initializeApp(getFirebaseConfig(), secondaryName);
+  const secondaryAuth = getAuth(secondaryApp);
+
+  const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+  await signOut(secondaryAuth);
+
+  await setDoc(doc(db, 'admins', cred.user.uid), {
+    username: emailToUsername(email),
+    email,
+    name: String(name || '').trim() || emailToUsername(email),
+    createdAt: new Date().toISOString(),
+    createdBy: currentAuth.currentUser.uid
+  });
+  return cred.user.uid;
+};
+
+// Remove o acesso ao painel (o login continua existindo no Auth, mas sem /admins não abre nada)
+export const revokeAdminAccess = async (uid) => {
+  const db = getFirestoreDb();
+  const currentAuth = getFirebaseAuth();
+  if (!db) throw new Error('firebase-not-configured');
+  if (currentAuth?.currentUser?.uid === uid) throw new Error('cannot-revoke-self');
+  await deleteDoc(doc(db, 'admins', uid));
+};
+
+// Troca a senha do próprio usuário logado (exige a senha atual)
+export const changeOwnPassword = async (currentPassword, newPassword) => {
+  const auth = getFirebaseAuth();
+  const user = auth?.currentUser;
+  if (!user?.email) throw new Error('not-admin');
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, newPassword);
+};
+
+// Observa a sessão: callback(user | null) — user só é repassado se for admin
+export const subscribeToAdminAuth = (callback) => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, async (user) => {
+    if (!user) return callback(null);
+    const ok = await checkIsAdmin(user.uid);
+    callback(ok ? user : null);
+  });
+};
+
 // Salva ou atualiza um documento no Firestore
-export const saveFirestoreDoc = async (collectionName, docId, data) => {
+// options.merge=false sobrescreve o documento inteiro (remove campos antigos)
+export const saveFirestoreDoc = async (collectionName, docId, data, options = { merge: true }) => {
   const db = getFirestoreDb();
   if (!db) return null;
   try {
     const docRef = doc(db, collectionName, String(docId));
     const cleaned = cleanFirestoreData(data);
-    await setDoc(docRef, cleaned, { merge: true });
+    await setDoc(docRef, cleaned, { merge: options.merge !== false });
     return true;
   } catch (err) {
     console.error(`Erro ao salvar no Firestore (${collectionName}/${docId}):`, err);

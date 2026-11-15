@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   SHOP_INFO,
   BARBERS,
@@ -14,10 +14,59 @@ import {
   isFirebaseConfigured,
   subscribeToCollection,
   saveFirestoreDoc,
-  deleteFirestoreDoc
+  deleteFirestoreDoc,
+  getFirestoreDocOnce,
+  subscribeToAdminAuth,
+  adminSignOut,
+  splitBarberData,
+  PRIVATE_BARBER_FIELDS,
+  getSlotId,
+  isCollectionEmptyOnServer
 } from '../services/firebase';
 
 const AppContext = createContext();
+
+// Data local (YYYY-MM-DD) — evita o salto de dia do toISOString() após 21h no Brasil
+const localDateStr = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// ID de agendamento não adivinhável (o cliente usa o ID para cancelar o próprio horário)
+const generateAppointmentId = () => {
+  const bytes = new Uint8Array(6);
+  (window.crypto || window.msCrypto).getRandomValues(bytes);
+  const rand = Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10).toUpperCase();
+  return `TB-${rand}`;
+};
+
+// Grava barbeiro separando dados públicos (/barbers) e sensíveis (/barbers_private)
+const saveBarberToCloud = async (barber) => {
+  const { publicData, privateData } = splitBarberData(barber);
+  await saveFirestoreDoc('barbers', barber.id, publicData, { merge: false });
+  if (Object.keys(privateData).length > 0) {
+    await saveFirestoreDoc('barbers_private', barber.id, privateData);
+  }
+};
+
+// Versão dos dados locais: ao mudar, descarta dados de demonstração salvos em navegadores antigos
+// (mantém catálogo e informações da barbearia).
+const LOCAL_DATA_VERSION = '2-producao';
+(() => {
+  try {
+    if (localStorage.getItem('teu_barber_data_version') === LOCAL_DATA_VERSION) return;
+    ['teu_barber_appointments', 'teu_barber_financial', 'teu_barber_acquisitions', 'teu_barber_blocked', 'teu_barber_clients', 'teu_barber_current_client']
+      .forEach(k => localStorage.removeItem(k));
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('teu_barber_client_'))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('teu_barber_data_version', LOCAL_DATA_VERSION);
+  } catch (e) {
+    console.warn('Não foi possível limpar dados locais antigos:', e);
+  }
+})();
 
 export function AppProvider({ children }) {
   // Load from localStorage or defaults
@@ -96,7 +145,32 @@ export function AppProvider({ children }) {
   const [reminder2hNotification, setReminder2hNotification] = useState(null);
   const [cloudConnected, setCloudConnected] = useState(() => isFirebaseConfigured());
 
-  // Conexão em tempo real com o Firestore (quando credenciais estiverem configuradas)
+  // Sessão do administrador (Firebase Auth + documento em /admins/{uid})
+  const [adminUser, setAdminUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(() => isFirebaseConfigured());
+  const isAdmin = Boolean(adminUser);
+
+  // Horários ocupados publicados na nuvem (sem dados do cliente)
+  const [occupiedSlots, setOccupiedSlots] = useState([]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured()) {
+      setAuthLoading(false);
+      return;
+    }
+    const unsub = subscribeToAdminAuth((user) => {
+      setAdminUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const logoutAdmin = async () => {
+    await adminSignOut();
+    setAdminUser(null);
+  };
+
+  // Dados PÚBLICOS em tempo real (site de agendamento e painel)
   useEffect(() => {
     if (!isFirebaseConfigured()) {
       setCloudConnected(false);
@@ -104,6 +178,46 @@ export function AppProvider({ children }) {
     }
 
     setCloudConnected(true);
+
+    const unsubSlots = subscribeToCollection('slots', (cloudSlots) => {
+      setOccupiedSlots(Array.isArray(cloudSlots) ? cloudSlots : []);
+    });
+
+    const unsubBarbers = subscribeToCollection('barbers', (cloudBarbers) => {
+      if (cloudBarbers && Array.isArray(cloudBarbers) && cloudBarbers.length > 0) {
+        // Preserva campos privados já carregados localmente (só existem no dispositivo do admin)
+        setBarbers(prev => cloudBarbers.map(cb => {
+          const local = prev.find(b => b.id === cb.id) || {};
+          const privateLocal = {};
+          PRIVATE_BARBER_FIELDS.forEach(f => { if (local[f] !== undefined) privateLocal[f] = local[f]; });
+          return { ...privateLocal, ...cb };
+        }));
+      }
+    });
+
+    const unsubServices = subscribeToCollection('services', (cloudServices) => {
+      if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
+        setServices(cloudServices);
+      }
+    });
+
+    const unsubBlocked = subscribeToCollection('blocked_slots', (cloudBlocked) => {
+      if (cloudBlocked && Array.isArray(cloudBlocked) && cloudBlocked.length > 0) {
+        setBlockedSlots(cloudBlocked);
+      }
+    });
+
+    return () => {
+      unsubSlots();
+      unsubBarbers();
+      unsubServices();
+      unsubBlocked();
+    };
+  }, []);
+
+  // Dados PRIVADOS em tempo real — somente com admin autenticado
+  useEffect(() => {
+    if (!isFirebaseConfigured() || !isAdmin) return;
 
     // 1. Escuta agendamentos da nuvem
     const unsubAppointments = subscribeToCollection('appointments', (cloudAppointments) => {
@@ -136,43 +250,73 @@ export function AppProvider({ children }) {
       }
     });
 
-    // 3. Escuta barbeiros da nuvem
-    const unsubBarbers = subscribeToCollection('barbers', (cloudBarbers) => {
-      if (cloudBarbers && Array.isArray(cloudBarbers) && cloudBarbers.length > 0) {
-        setBarbers(cloudBarbers);
+    // 3. Dados sensíveis dos barbeiros (CPF, PIX, comissão, telefone)
+    const unsubBarbersPrivate = subscribeToCollection('barbers_private', (privList) => {
+      if (privList && Array.isArray(privList) && privList.length > 0) {
+        setBarbers(prev => prev.map(b => {
+          const priv = privList.find(p => p.id === b.id);
+          if (!priv) return b;
+          const { id, ...privFields } = priv;
+          return { ...b, ...privFields };
+        }));
       }
     });
 
-    // 4. Escuta serviços da nuvem
-    const unsubServices = subscribeToCollection('services', (cloudServices) => {
-      if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
-        setServices(cloudServices);
-      }
-    });
-
-    // 5. Escuta financeiro da nuvem
+    // 4. Escuta financeiro da nuvem
     const unsubFinancial = subscribeToCollection('financial', (cloudFin) => {
       if (cloudFin && Array.isArray(cloudFin) && cloudFin.length > 0) {
         setFinancialRecords(cloudFin);
       }
     });
 
-    // 6. Escuta horários bloqueados da nuvem
-    const unsubBlocked = subscribeToCollection('blocked_slots', (cloudBlocked) => {
-      if (cloudBlocked && Array.isArray(cloudBlocked) && cloudBlocked.length > 0) {
-        setBlockedSlots(cloudBlocked);
-      }
-    });
-
     return () => {
       unsubAppointments();
       unsubClients();
-      unsubBarbers();
-      unsubServices();
+      unsubBarbersPrivate();
       unsubFinancial();
-      unsubBlocked();
     };
-  }, []);
+  }, [isAdmin]);
+
+  // Migração única: barbeiros antigos com CPF/PIX no documento público
+  const barberMigrationDone = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || barberMigrationDone.current || !isFirebaseConfigured()) return;
+    barberMigrationDone.current = true;
+    const unsub = subscribeToCollection('barbers', (cloudBarbers) => {
+      unsub();
+      (cloudBarbers || []).forEach(cb => {
+        const hasPrivate = PRIVATE_BARBER_FIELDS.some(f => cb[f] !== undefined);
+        if (hasPrivate) saveBarberToCloud(cb);
+      });
+    });
+
+    // Primeiro acesso de um admin com a nuvem vazia: publica equipe e catálogo atuais.
+    // Sem isso, o primeiro serviço/barbeiro salvo pelo painel substituiria a lista inteira no site.
+    (async () => {
+      if (await isCollectionEmptyOnServer('barbers') === true) {
+        barbers.forEach(b => saveBarberToCloud(b));
+      }
+      if (await isCollectionEmptyOnServer('services') === true) {
+        services.forEach(s => saveFirestoreDoc('services', s.id, s));
+      }
+    })();
+  }, [isAdmin]);
+
+  // Admin: libera na nuvem o horário de agendamentos cancelados (inclusive cancelados pelo cliente)
+  useEffect(() => {
+    if (!isAdmin || !isFirebaseConfigured()) return;
+    appointments.forEach(apt => {
+      if (apt.status !== 'cancelado') return;
+      const slotId = getSlotId(apt.barberId, apt.date, apt.time);
+      const stillBooked = appointments.some(other =>
+        other.status !== 'cancelado' &&
+        getSlotId(other.barberId, other.date, other.time) === slotId
+      );
+      if (!stillBooked && occupiedSlots.some(s => s.id === slotId)) {
+        deleteFirestoreDoc('slots', slotId);
+      }
+    });
+  }, [isAdmin, appointments, occupiedSlots]);
 
   // Sync state to localStorage
   useEffect(() => {
@@ -303,75 +447,93 @@ export function AppProvider({ children }) {
     return null;
   };
 
+  // Busca assíncrona do cadastro na nuvem (leitura por ID; o cliente nunca lista a base)
+  const lookupClientByPhone = async (phone) => {
+    const local = getClientByPhone(phone);
+    if (local) return local;
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.length < 10 || !isFirebaseConfigured()) return null;
+    const cloud = await getFirestoreDocOnce('clients', cleanPhone);
+    if (!cloud) return null;
+    const { id, ...data } = cloud;
+    const found = { ...data, phone: cleanPhone };
+    setClients(prev => prev.some(c => normalizePhone(c.phone) === cleanPhone) ? prev : [found, ...prev]);
+    return found;
+  };
+
   const logoutClient = () => {
     setCurrentClientPhone('');
     localStorage.removeItem('teu_barber_current_client');
   };
 
-  // Motor de Disparo Automático de Lembrete no WhatsApp (2 horas antes)
+  // Motor de Lembrete no WhatsApp (2 horas antes) — roda SOMENTE no painel do admin autenticado.
+  // A marcação reminder2hSent é gravada na nuvem para não repetir em outros dispositivos.
+  const appointmentsRef = useRef(appointments);
+  appointmentsRef.current = appointments;
+
   useEffect(() => {
+    if (!isAdmin) return;
+
     const check2HourReminders = () => {
       const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
+      const todayStr = localDateStr(now);
 
-      setAppointments(prev => {
-        let hasChanges = false;
-        const updated = prev.map(apt => {
-          if (apt.status !== 'confirmado' && apt.status !== 'pendente') return apt;
-          if (apt.date !== todayStr) return apt;
-          if (apt.reminder2hSent) return apt;
+      const due = [];
+      appointmentsRef.current.forEach(apt => {
+        if (apt.status !== 'confirmado' && apt.status !== 'pendente') return;
+        if (apt.date !== todayStr || apt.reminder2hSent) return;
 
-          const [h, m] = (apt.time || '').split(':').map(Number);
-          if (isNaN(h) || isNaN(m)) return apt;
+        const [h, m] = (apt.time || '').split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return;
 
-          const aptDateTime = new Date();
-          aptDateTime.setHours(h, m, 0, 0);
+        const aptDateTime = new Date();
+        aptDateTime.setHours(h, m, 0, 0);
+        const diffMinutes = Math.floor((aptDateTime.getTime() - now.getTime()) / (1000 * 60));
 
-          const diffMinutes = Math.floor((aptDateTime.getTime() - now.getTime()) / (1000 * 60));
-
-          // Se estiver dentro da janela de 2 horas (0 a 120 minutos)
-          if (diffMinutes > 0 && diffMinutes <= 120) {
-            hasChanges = true;
-            const updatedApt = {
-              ...apt,
-              reminder2hSent: true,
-              reminder2hSentAt: new Date().toISOString()
-            };
-
-            // Notifica o sistema e aciona disparo no WhatsApp
-            setReminder2hNotification({
-              appointment: updatedApt,
-              diffMinutes,
-              triggeredAt: new Date().toISOString()
-            });
-
-            // Disparo automático via abertura de WhatsApp
-            try {
-              const msg = create2HourReminderWhatsAppMessage(updatedApt, shopInfo);
-              const url = generateWhatsAppLink(updatedApt.clientPhone, msg);
-              window.open(url, '_blank');
-            } catch (err) {
-              console.warn('Disparo automático bloqueado pelo navegador', err);
-            }
-
-            return updatedApt;
-          }
-
-          return apt;
-        });
-
-        return hasChanges ? updated : prev;
+        if (diffMinutes > 0 && diffMinutes <= 120) {
+          due.push({ apt, diffMinutes });
+        }
       });
+
+      if (due.length === 0) return;
+
+      const sentAt = new Date().toISOString();
+      const dueIds = new Set(due.map(d => d.apt.id));
+      setAppointments(prev => prev.map(apt =>
+        dueIds.has(apt.id) ? { ...apt, reminder2hSent: true, reminder2hSentAt: sentAt } : apt
+      ));
+
+      due.forEach(({ apt }) => {
+        if (isFirebaseConfigured()) {
+          saveFirestoreDoc('appointments', apt.id, { reminder2hSent: true, reminder2hSentAt: sentAt });
+        }
+      });
+
+      // Notificação flutuante com botão para abrir o WhatsApp do cliente
+      const last = due[due.length - 1];
+      setReminder2hNotification({
+        appointment: { ...last.apt, reminder2hSent: true, reminder2hSentAt: sentAt },
+        diffMinutes: last.diffMinutes,
+        triggeredAt: sentAt
+      });
+
+      // Disparo automático (pode ser bloqueado pelo navegador; o botão da notificação cobre o caso)
+      try {
+        const msg = create2HourReminderWhatsAppMessage(last.apt, shopInfo);
+        window.open(generateWhatsAppLink(last.apt.clientPhone, msg), '_blank');
+      } catch (err) {
+        console.warn('Disparo automático bloqueado pelo navegador', err);
+      }
     };
 
     check2HourReminders();
     const interval = setInterval(check2HourReminders, 30000);
     return () => clearInterval(interval);
-  }, [shopInfo]);
+  }, [shopInfo, isAdmin]);
 
   // Appointment Actions
   const addAppointment = (data) => {
-    const id = `TB-${Date.now().toString().slice(-5)}`;
+    const id = generateAppointmentId();
     const newApt = {
       id,
       status: 'confirmado',
@@ -385,6 +547,16 @@ export function AppProvider({ children }) {
     // Grava no Firestore caso Firebase esteja conectado
     if (isFirebaseConfigured()) {
       saveFirestoreDoc('appointments', newApt.id, newApt);
+      // Publica só a ocupação do horário (sem nome/telefone) para os outros clientes
+      if (newApt.barberId && newApt.date && newApt.time) {
+        saveFirestoreDoc('slots', getSlotId(newApt.barberId, newApt.date, newApt.time), {
+          barberId: newApt.barberId,
+          date: newApt.date,
+          time: newApt.time,
+          duration: Number(newApt.duration || shopInfo?.slotDurationMinutes || 30),
+          createdAt: newApt.createdAt
+        });
+      }
     }
 
     // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
@@ -398,50 +570,58 @@ export function AppProvider({ children }) {
   };
 
   const updateAppointmentStatus = (id, newStatus, paymentMethod) => {
+    const current = appointments.find(apt => apt.id === id);
     let autoFinEntry = null;
 
+    // Concluído pela primeira vez: lança entrada automática no financeiro
+    if (current && newStatus === 'concluido' && current.status !== 'concluido') {
+      autoFinEntry = {
+        id: `fin-auto-${Date.now()}`,
+        type: 'entrada',
+        category: 'Serviço',
+        description: `Atendimento ${current.clientName} - ${current.serviceName}`,
+        amount: Number(current.price),
+        barberId: current.barberId,
+        barberName: current.barberName,
+        paymentMethod: paymentMethod || current.paymentMethod || 'pix',
+        date: current.date || localDateStr(),
+        appointmentId: current.id
+      };
+      setFinancialRecords(finPrev => [autoFinEntry, ...finPrev]);
+    }
+
     setAppointments(prev => prev.map(apt => {
-      if (apt.id === id) {
-        const updated = { ...apt, status: newStatus };
-        if (paymentMethod) updated.paymentMethod = paymentMethod;
-
-        // If completed and not registered in financial, automatically record entry
-        if (newStatus === 'concluido' && apt.status !== 'concluido') {
-          autoFinEntry = {
-            id: `fin-auto-${Date.now()}`,
-            type: 'entrada',
-            category: 'Serviço',
-            description: `Atendimento ${apt.clientName} - ${apt.serviceName}`,
-            amount: Number(apt.price),
-            barberId: apt.barberId,
-            barberName: apt.barberName,
-            paymentMethod: paymentMethod || apt.paymentMethod || 'pix',
-            date: apt.date || new Date().toISOString().split('T')[0],
-            appointmentId: apt.id
-          };
-          setFinancialRecords(finPrev => [autoFinEntry, ...finPrev]);
-        }
-
-        return updated;
-      }
-      return apt;
+      if (apt.id !== id) return apt;
+      const updated = { ...apt, status: newStatus };
+      if (paymentMethod) updated.paymentMethod = paymentMethod;
+      return updated;
     }));
 
     if (isFirebaseConfigured()) {
+      // Cliente (não admin) só tem permissão para gravar status = 'cancelado'
       saveFirestoreDoc('appointments', id, {
         status: newStatus,
-        ...(paymentMethod ? { paymentMethod } : {})
+        ...(paymentMethod && isAdmin ? { paymentMethod } : {})
       });
-      if (autoFinEntry) {
+      if (autoFinEntry && isAdmin) {
         saveFirestoreDoc('financial', autoFinEntry.id, autoFinEntry);
       }
     }
   };
 
   const deleteAppointment = (id) => {
+    const target = appointments.find(apt => apt.id === id);
     setAppointments(prev => prev.filter(apt => apt.id !== id));
     if (isFirebaseConfigured()) {
       deleteFirestoreDoc('appointments', id);
+      if (target) {
+        const slotId = getSlotId(target.barberId, target.date, target.time);
+        const stillBooked = appointments.some(a =>
+          a.id !== id && a.status !== 'cancelado' &&
+          getSlotId(a.barberId, a.date, a.time) === slotId
+        );
+        if (!stillBooked) deleteFirestoreDoc('slots', slotId);
+      }
     }
   };
 
@@ -599,7 +779,7 @@ export function AppProvider({ children }) {
     };
     setBarbers(prev => [...prev, newBarber]);
     if (isFirebaseConfigured()) {
-      saveFirestoreDoc('barbers', newBarber.id, newBarber);
+      saveBarberToCloud(newBarber);
     }
     return newBarber;
   };
@@ -613,7 +793,7 @@ export function AppProvider({ children }) {
           commissionRate: updates.commissionRate !== undefined ? Number(updates.commissionRate) : b.commissionRate
         };
         if (isFirebaseConfigured()) {
-          saveFirestoreDoc('barbers', id, updated);
+          saveBarberToCloud(updated);
         }
         return updated;
       }
@@ -629,6 +809,7 @@ export function AppProvider({ children }) {
     setBarbers(prev => prev.filter(b => b.id !== id));
     if (isFirebaseConfigured()) {
       deleteFirestoreDoc('barbers', id);
+      deleteFirestoreDoc('barbers_private', id);
     }
   };
 
@@ -709,8 +890,17 @@ export function AppProvider({ children }) {
 
       return slotStart < aptEnd && aptStart < slotEnd;
     });
+    if (hasConflict) return false;
 
-    return !hasConflict;
+    // 5. Horários ocupados publicados na nuvem (agendamentos feitos em outros dispositivos)
+    const hasCloudConflict = occupiedSlots.some(s => {
+      if (s.date !== date || s.barberId !== barberId) return false;
+      const sStart = timeToMinutes(s.time);
+      const sEnd = sStart + Number(s.duration || slotDuration);
+      return slotStart < sEnd && sStart < slotEnd;
+    });
+
+    return !hasCloudConflict;
   };
 
   // Reset to initial data
@@ -806,7 +996,12 @@ export function AppProvider({ children }) {
       exportData,
       importData,
       cloudConnected,
-      setCloudConnected
+      setCloudConnected,
+      lookupClientByPhone,
+      adminUser,
+      isAdmin,
+      authLoading,
+      logoutAdmin
     }}>
       {children}
     </AppContext.Provider>

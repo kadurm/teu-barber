@@ -8,7 +8,7 @@ import { MapPin, Phone, Instagram, Lock, Clock, X, MessageSquare } from 'lucide-
 import { generateWhatsAppLink, create2HourReminderWhatsAppMessage } from './utils/formatters';
 
 function AppContent() {
-  const { shopInfo, reminder2hNotification, setReminder2hNotification } = useApp();
+  const { shopInfo, reminder2hNotification, setReminder2hNotification, isAdmin, authLoading, logoutAdmin } = useApp();
 
   // Route state
   const checkIsAdmin = () => {
@@ -19,9 +19,11 @@ function AppContent() {
   };
 
   const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdmin);
-  const [isAdminAuth, setIsAdminAuth] = useState(() => {
-    return sessionStorage.getItem('teu_barber_admin_auth') === 'true';
-  });
+
+  // Limpa a flag antiga de sessão (o acesso agora depende do Firebase Auth)
+  useEffect(() => {
+    sessionStorage.removeItem('teu_barber_admin_auth');
+  }, []);
 
   // Dynamically update document title based on route
   useEffect(() => {
@@ -55,9 +57,8 @@ function AppContent() {
     setIsAdminRoute(false);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('teu_barber_admin_auth');
-    setIsAdminAuth(false);
+  const handleLogout = async () => {
+    await logoutAdmin();
     navigateToClient();
   };
 
@@ -66,7 +67,11 @@ function AppContent() {
       
       {/* If in admin route */}
       {isAdminRoute ? (
-        isAdminAuth ? (
+        authLoading ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+            Verificando acesso...
+          </div>
+        ) : isAdmin ? (
           <div className="flex-1 py-4">
             <AdminDashboard
               onBackToClient={navigateToClient}
@@ -75,10 +80,7 @@ function AppContent() {
           </div>
         ) : (
           <div className="flex-1">
-            <AdminLogin
-              onLoginSuccess={() => setIsAdminAuth(true)}
-              onBackToSite={navigateToClient}
-            />
+            <AdminLogin onBackToSite={navigateToClient} />
           </div>
         )
       ) : (
@@ -122,8 +124,8 @@ function AppContent() {
         </>
       )}
 
-      {/* 2-Hour Auto Reminder Floating Notification */}
-      {reminder2hNotification && (
+      {/* 2-Hour Auto Reminder Floating Notification (somente no painel autenticado) */}
+      {isAdmin && isAdminRoute && reminder2hNotification && (
         <div className="fixed bottom-5 right-5 z-50 max-w-md w-full bg-zinc-950/95 border-2 border-amber-500 rounded-3xl p-4 shadow-2xl shadow-amber-500/20 backdrop-blur-xl animate-fadeIn">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">

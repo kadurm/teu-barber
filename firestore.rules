@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admin = usuário autenticado no Firebase Auth E com documento em /admins/{uid}
+    // (criar manualmente no console; ninguém consegue se auto-promover).
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isShortString(v, max) {
+      return v is string && v.size() > 0 && v.size() <= max;
+    }
+
+    // O PRIMEIRO admin é criado no console do Firebase; depois, admins gerenciam outros admins pelo painel.
+    match /admins/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['username', 'email', 'name', 'createdAt', 'createdBy'])
+        && request.resource.data.createdBy == request.auth.uid;
+      // Ninguém remove o próprio acesso (evita ficar sem nenhum admin)
+      allow delete: if isAdmin() && request.auth.uid != uid;
+      allow update: if false;
+    }
+
+    // ---------- Dados públicos (site de agendamento) ----------
+    match /services/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Perfil público do barbeiro (sem CPF, PIX, telefone ou comissão)
+    match /barbers/{id} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && !request.resource.data.keys().hasAny(['document', 'pixKey', 'pixKeyType', 'commissionRate', 'phone']);
+    }
+
+    match /blocked_slots/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Ocupação de horários: só barbeiro/data/hora/duração (sem dados do cliente).
+    // ID determinístico {barberId}_{date}_{HHMM}: o público só cria, nunca sobrescreve.
+    match /slots/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly(['barberId', 'date', 'time', 'duration', 'createdAt'])
+        && isShortString(request.resource.data.barberId, 60)
+        && isShortString(request.resource.data.date, 10)
+        && isShortString(request.resource.data.time, 5)
+        && request.resource.data.duration is number
+        && request.resource.data.duration > 0
+        && request.resource.data.duration <= 480
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- Dados privados ----------
+    match /barbers_private/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /appointments/{id} {
+      allow read, delete: if isAdmin();
+      // Cliente cria agendamento sem conseguir ler os dos outros
+      allow create: if isAdmin() || (
+        request.resource.data.status in ['confirmado', 'pendente']
+        && isShortString(request.resource.data.clientName, 120)
+        && isShortString(request.resource.data.clientPhone, 20)
+        && isShortString(request.resource.data.date, 10)
+        && isShortString(request.resource.data.time, 5)
+        && request.resource.data.get('reminder2hSent', false) == false
+      );
+      // Cliente só pode cancelar (precisa conhecer o ID aleatório do próprio agendamento)
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'cancelado'
+      );
+    }
+
+    // Cadastro do cliente: leitura só por ID (telefone), nunca listagem.
+    match /clients/{phone} {
+      allow get: if true;
+      allow list, delete: if isAdmin();
+      allow create, update: if isAdmin() || (
+        request.resource.data.keys().hasOnly(['phone', 'name', 'notes', 'createdAt', 'updatedAt', 'totalBookings', 'source'])
+        && isShortString(request.resource.data.name, 120)
+        && request.resource.data.phone == phone
+      );
+    }
+
+    // Coleções exclusivas do admin. Qualquer coleção não listada aqui fica bloqueada por padrão.
+    // (Sem curinga /{document=**}: ele somaria permissões às regras acima, ex.: em /admins.)
+    match /financial/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /settings/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /acquisitions/{id} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
