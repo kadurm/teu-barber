@@ -1,7 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, FileText, Key, Percent, CheckCircle2 } from 'lucide-react';
+import { X, User, Phone, FileText, Key, Percent, CheckCircle2, Camera, Upload } from 'lucide-react';
+
+// Tamanho final da foto de perfil (quadrada). Fica salva no próprio cadastro do barbeiro,
+// então precisa ser leve: alvo de até ~45 KB.
+const AVATAR_SIZE = 400;
+const AVATAR_MAX_CHARS = 60000;
+
+const loadImage = (file) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error('Formato não suportado neste navegador. Envie uma foto em JPG, PNG ou WebP.'));
+  };
+  img.src = url;
+});
+
+// Recorta no centro em quadrado, reduz e comprime (WebP; JPEG se o navegador não gerar WebP)
+export const imageFileToAvatar = async (file) => {
+  if (!file.type.startsWith('image/') && !/\.(heic|heif)$/i.test(file.name)) {
+    throw new Error('Selecione um arquivo de imagem.');
+  }
+  const img = await loadImage(file);
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  const sx = (img.naturalWidth - side) / 2;
+  // Retratos: sobe um pouco o recorte para priorizar o rosto
+  const sy = img.naturalHeight > img.naturalWidth ? (img.naturalHeight - side) * 0.3 : (img.naturalHeight - side) / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = AVATAR_SIZE;
+  canvas.height = AVATAR_SIZE;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+
+  for (const quality of [0.82, 0.72, 0.6, 0.5]) {
+    let data = canvas.toDataURL('image/webp', quality);
+    if (!data.startsWith('data:image/webp')) data = canvas.toDataURL('image/jpeg', quality);
+    if (data.length <= AVATAR_MAX_CHARS) return data;
+  }
+  throw new Error('Imagem muito detalhada para otimizar. Tente outra foto.');
+};
 
 export default function EditPartnerModal({ isOpen, onClose, onSave, barberToEdit }) {
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     role: 'Barbeiro Parceiro',
@@ -17,6 +61,7 @@ export default function EditPartnerModal({ isOpen, onClose, onSave, barberToEdit
   });
 
   useEffect(() => {
+    setPhotoError('');
     if (barberToEdit) {
       setFormData({
         name: barberToEdit.name || '',
@@ -50,8 +95,25 @@ export default function EditPartnerModal({ isOpen, onClose, onSave, barberToEdit
 
   if (!isOpen) return null;
 
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError('');
+    setPhotoLoading(true);
+    try {
+      const avatar = await imageFileToAvatar(file);
+      setFormData(prev => ({ ...prev, avatar }));
+    } catch (err) {
+      setPhotoError(err.message || 'Não foi possível usar essa imagem.');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (photoLoading) return;
     if (!formData.name.trim()) {
       alert('Por favor, informe o nome do profissional.');
       return;
@@ -216,16 +278,30 @@ export default function EditPartnerModal({ isOpen, onClose, onSave, barberToEdit
               />
             </div>
 
-            {/* Foto URL */}
+            {/* Foto de Perfil (upload) */}
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-semibold text-zinc-300">URL da Foto de Perfil</label>
-              <input
-                type="url"
-                value={formData.avatar}
-                onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
-                placeholder="https://..."
-                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
-              />
+              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-amber-500" />
+                Foto de Perfil
+              </label>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 flex items-center justify-center">
+                  {formData.avatar
+                    ? <img src={formData.avatar} alt="Foto do parceiro" className="w-full h-full object-cover" />
+                    : <User className="w-8 h-8 text-zinc-600" />}
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <label className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-xs font-semibold transition-colors ${photoLoading ? 'text-zinc-500 cursor-wait' : 'text-white hover:bg-white/5 cursor-pointer'}`}>
+                    <Upload className="w-4 h-4 text-amber-400" />
+                    {photoLoading ? 'Processando...' : (formData.avatar ? 'Trocar foto' : 'Enviar foto')}
+                    <input type="file" accept="image/*" className="hidden" disabled={photoLoading} onChange={handlePhotoChange} />
+                  </label>
+                  <p className="text-[11px] text-zinc-500">
+                    Recortada em quadrado e otimizada automaticamente. Prefira foto do rosto, de frente.
+                  </p>
+                  {photoError && <p className="text-[11px] text-red-400">{photoError}</p>}
+                </div>
+              </div>
             </div>
 
             {/* Status Ativo */}

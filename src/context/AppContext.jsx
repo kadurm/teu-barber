@@ -51,6 +51,21 @@ const saveBarberToCloud = async (barber) => {
   }
 };
 
+// Fotos reais da equipe (public/barbers). Substituem fotos provisórias já gravadas na nuvem.
+const TEAM_PHOTOS = {
+  user1: '/barbers/teu.webp',
+  user2: '/barbers/gustavo.webp',
+  'user-8536': '/barbers/matheus.webp'
+};
+
+// Foto provisória = vazia, banco de imagens ou caminho que só existe em desenvolvimento
+const isPlaceholderAvatar = (avatar) => typeof avatar !== 'string' || avatar === ''
+  || avatar.includes('images.unsplash.com') || avatar.startsWith('/src/');
+
+const withTeamPhoto = (barber) => (TEAM_PHOTOS[barber.id] && isPlaceholderAvatar(barber.avatar))
+  ? { ...barber, avatar: TEAM_PHOTOS[barber.id] }
+  : barber;
+
 // Versão dos dados locais: ao mudar, descarta dados de demonstração salvos em navegadores antigos
 // (mantém catálogo e informações da barbearia).
 const LOCAL_DATA_VERSION = '2-producao';
@@ -190,7 +205,7 @@ export function AppProvider({ children }) {
           const local = prev.find(b => b.id === cb.id) || {};
           const privateLocal = {};
           PRIVATE_BARBER_FIELDS.forEach(f => { if (local[f] !== undefined) privateLocal[f] = local[f]; });
-          return { ...privateLocal, ...cb };
+          return withTeamPhoto({ ...privateLocal, ...cb });
         }));
       }
     });
@@ -286,7 +301,10 @@ export function AppProvider({ children }) {
       unsub();
       (cloudBarbers || []).forEach(cb => {
         const hasPrivate = PRIVATE_BARBER_FIELDS.some(f => cb[f] !== undefined);
-        if (hasPrivate) saveBarberToCloud(cb);
+        // Troca fotos provisórias (banco de imagens ou caminho de desenvolvimento) pelas fotos reais da equipe.
+        // Fotos enviadas pelo painel (data:) ou já atualizadas não são tocadas.
+        const updated = withTeamPhoto(cb);
+        if (hasPrivate || updated !== cb) saveBarberToCloud(updated);
       });
     });
 
