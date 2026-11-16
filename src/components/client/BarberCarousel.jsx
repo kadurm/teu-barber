@@ -15,7 +15,7 @@ const wrapOffset = (d, n) => {
   return m >= n / 2 ? m - n : m;
 };
 
-const SPACING = 0.64; // deslocamento lateral entre cards, em fração da largura do card
+const SPACING = 0.8; // deslocamento lateral entre cards, em fração da largura do card
 const DRAG_START_PX = 6;
 const SWIPE_MIN_PX = 30;
 
@@ -169,7 +169,7 @@ export default function BarberCarousel({ barbers, selectedBarberId, onSelect }) 
                 if (movedRef.current) return;
                 if (!isCenter) goTo(Math.round(posRef.current) + Math.round(d));
               }}
-              className={`[grid-area:1/1] w-[80%] max-w-[420px] p-5 rounded-2xl border metallic-card ${
+              className={`[grid-area:1/1] w-[64%] max-w-[300px] p-5 rounded-2xl border metallic-card ${
                 isSelected
                   ? 'border-amber-400/80 ring-2 ring-amber-400/30 bg-gradient-to-b from-slate-900 to-[#1b1e26]'
                   : 'border-white/10'
@@ -182,13 +182,13 @@ export default function BarberCarousel({ barbers, selectedBarberId, onSelect }) 
                 willChange: 'transform, opacity'
               }}
             >
-              <div className="flex items-start gap-4">
-                <div className="relative shrink-0">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative">
                   <img
                     src={barber.avatar}
                     alt={barber.name}
                     draggable={false}
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-600 shadow-md"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-600 shadow-md"
                   />
                   {isSelected && (
                     <div className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 p-1 rounded-full shadow-lg">
@@ -197,15 +197,12 @@ export default function BarberCarousel({ barbers, selectedBarberId, onSelect }) 
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-white">{barber.name}</h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">{barber.role}</p>
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">{barber.specialty}</p>
-                </div>
+                <h3 className="mt-3 text-lg font-bold text-white">{barber.name}</h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">{barber.role}</p>
+                <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed min-h-[2.5rem]">{barber.specialty}</p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Disponível para agendamento</span>
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-center text-xs">
                 <span className={`font-semibold flex items-center gap-1 ${isSelected ? 'text-amber-400' : 'text-slate-400'}`}>
                   {isSelected ? 'Selecionado' : 'Toque para escolher'}
                   <ChevronRight className="w-3.5 h-3.5" />
