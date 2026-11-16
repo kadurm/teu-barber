@@ -98,6 +98,12 @@ export function create2HourReminderWhatsAppMessage(booking, shopInfo) {
     `Já estamos nos organizando para te receber com a melhor experiência! Se tiver algum imprevisto, avise por aqui. Até breve! 💈✂️`;
 }
 
+// Data no fuso local (YYYY-MM-DD). toISOString() usa UTC e, no Brasil, vira o dia seguinte após as 21h.
+export function toLocalISODate(d = new Date()) {
+  const date = d instanceof Date ? d : new Date(d);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 // Generates time slots based on start/end, lunch break, and step
 export function generateTimeSlots(start = "08:30", end = "19:30", stepMinutes = 30, lunchStart = "12:00", lunchEnd = "13:30") {
   const slots = [];
@@ -110,8 +116,9 @@ export function generateTimeSlots(start = "08:30", end = "19:30", stepMinutes = 
   const endMinutes = endH * 60 + endM;
   const lStartMinutes = lunchStartH * 60 + lunchStartM;
   const lEndMinutes = lunchEndH * 60 + lunchEndM;
+  const step = Number(stepMinutes) > 0 ? Number(stepMinutes) : 30; // valor vindo de formulário pode ser string
 
-  for (let mins = startMinutes; mins < endMinutes; mins += stepMinutes) {
+  for (let mins = startMinutes; mins < endMinutes; mins += step) {
     // Skip lunch break
     if (mins >= lStartMinutes && mins < lEndMinutes) {
       continue;

@@ -16,11 +16,12 @@ import {
   ChevronRight
 } from 'lucide-react';
 import SalesPerformanceChart from './SalesPerformanceChart';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function DashboardOverviewTab({ onNavigateTab, onOpenNewAppointment }) {
   const { shopInfo, appointments, services, barbers, financialRecords, acquisitions } = useApp();
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => toLocalISODate(new Date()), []);
 
   // Helper para formatar data em YYYY-MM-DD para inputs
   const formatDateToInput = (d) => {

@@ -12,12 +12,13 @@ import {
   CheckCircle2,
   ShieldAlert
 } from 'lucide-react';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function ScheduleTab() {
   const { shopInfo, setShopInfo, barbers, appointments, blockedSlots, toggleBlockedSlot, isSlotAvailable, timeToMinutes, getAppointmentDuration } = useApp();
 
   const [selectedBarberId, setSelectedBarberId] = useState('user1');
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => toLocalISODate(new Date()));
 
   // Form for shop operating hours
   const [openTime, setOpenTime] = useState(shopInfo.openTime);

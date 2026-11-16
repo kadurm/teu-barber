@@ -38,6 +38,14 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['document', 'pixKey', 'pixKeyType', 'commissionRate', 'phone']);
     }
 
+    // Nome, contato e horários da barbearia (sem chaves de pagamento)
+    match /public_settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'displayPhone', 'address', 'instagram', 'instagramUrl',
+          'openTime', 'closeTime', 'saturdayOpenTime', 'saturdayCloseTime', 'lunchStart', 'lunchEnd', 'slotDurationMinutes']);
+    }
+
     match /blocked_slots/{id} {
       allow read: if true;
       allow write: if isAdmin();

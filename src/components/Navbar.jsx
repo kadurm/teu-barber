@@ -29,16 +29,9 @@ export default function Navbar() {
                   className="w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-300" 
                 />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-serif tracking-widest text-lg sm:text-xl font-extrabold silver-text-gradient uppercase">
-                    Teu Barber
-                  </span>
-                  <span className="text-[10px] tracking-widest font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300 border border-white/10">
-                    STUDIO
-                  </span>
-                </div>
-              </div>
+              <span className="font-serif tracking-widest text-lg sm:text-xl font-extrabold silver-text-gradient uppercase whitespace-nowrap">
+                Teu Barber
+              </span>
             </a>
 
             {/* Customer Navigation Contacts & Profile */}

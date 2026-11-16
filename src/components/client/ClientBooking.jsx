@@ -35,6 +35,17 @@ import {
 import MercadoPagoCheckout from './MercadoPagoCheckout';
 import ClientProfileModal from './ClientProfileModal';
 import BarberCarousel from './BarberCarousel';
+import { toLocalISODate } from '../../utils/formatters';
+
+// Pagamento online (carteira / Mercado Pago) ainda é uma SIMULAÇÃO: não cobra nada e marcaria o horário
+// como pago. Fica oculto até a integração real com o Mercado Pago (backend + webhook de confirmação).
+const ONLINE_PAYMENTS_ENABLED = false;
+
+const SUNDAY = 0;
+const isClosedDay = (isoDate) => {
+  const [y, m, d] = (isoDate || '').split('-').map(Number);
+  return !y ? false : new Date(y, m - 1, d).getDay() === SUNDAY;
+};
 
 export default function ClientBooking() {
   // Device detection for Apple Pay vs Google Pay
@@ -69,13 +80,14 @@ export default function ClientBooking() {
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    if (today.getDay() === SUNDAY) today.setDate(today.getDate() + 1); // domingo: já abre na segunda
+    return toLocalISODate(today);
   });
   const [selectedTime, setSelectedTime] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('wallet'); // 'wallet', 'mercadopago', or 'local'
+  const [paymentMethod, setPaymentMethod] = useState(ONLINE_PAYMENTS_ENABLED ? 'wallet' : 'local'); // 'wallet', 'mercadopago', or 'local'
   const [showMercadoPagoModal, setShowMercadoPagoModal] = useState(false);
 
   // Service category filter
@@ -109,7 +121,7 @@ export default function ClientBooking() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = toLocalISODate(d);
       const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
       const dayNum = d.getDate();
       const monthShort = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
@@ -128,7 +140,18 @@ export default function ClientBooking() {
       shopInfo.lunchEnd
     );
 
-    return allSlots.map(time => {
+    if (isClosedDay(selectedDate)) return [];
+
+    // Hoje: esconde horários que já passaram
+    const now = new Date();
+    const isToday = selectedDate === toLocalISODate(now);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return allSlots.filter(time => {
+      if (!isToday) return true;
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m > nowMinutes;
+    }).map(time => {
       const available = isSlotAvailable(selectedDate, time, selectedBarberId, selectedService?.duration);
       return {
         time,
@@ -136,6 +159,11 @@ export default function ClientBooking() {
       };
     });
   }, [shopInfo, selectedDate, selectedBarberId, selectedService, isSlotAvailable]);
+
+  // Trocar profissional ou serviço invalida o horário escolhido antes
+  useEffect(() => {
+    setSelectedTime('');
+  }, [selectedBarberId, selectedServiceId]);
 
   // Auto pre-fill if client is already known on this device
   useEffect(() => {
@@ -196,6 +224,20 @@ export default function ClientBooking() {
     }
     if (clientPhone.length < 10) {
       alert("Por favor, digite um telefone/WhatsApp válido com DDD (ex: 38 99121-8119).");
+      return;
+    }
+
+    // Revalida: o horário pode ter sido ocupado por outro cliente, já ter passado
+    // ou não comportar o serviço (se o cliente voltou e trocou de serviço/profissional)
+    const [h, m] = (selectedTime || '').split(':').map(Number);
+    const now = new Date();
+    const isPast = selectedDate < toLocalISODate(now)
+      || (selectedDate === toLocalISODate(now) && h * 60 + m <= now.getHours() * 60 + now.getMinutes());
+    if (!selectedService || !selectedTime || isPast || isClosedDay(selectedDate)
+      || !isSlotAvailable(selectedDate, selectedTime, selectedBarber.id, selectedService.duration)) {
+      alert("Esse horário não está mais disponível. Escolha outro horário, por favor.");
+      setSelectedTime('');
+      setStep(3);
       return;
     }
 
@@ -527,15 +569,20 @@ export default function ClientBooking() {
             <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
               {upcomingDays.map(day => {
                 const isSelected = selectedDate === day.iso;
+                const closed = isClosedDay(day.iso);
                 return (
                   <button
                     key={day.iso}
+                    disabled={closed}
+                    title={closed ? 'Fechado aos domingos' : undefined}
                     onClick={() => {
                       setSelectedDate(day.iso);
                       setSelectedTime(''); // Reset time selection on date change
                     }}
                     className={`py-3 px-2 rounded-xl flex flex-col items-center justify-center transition-all border ${
-                      isSelected
+                      closed
+                        ? 'bg-slate-900/40 border-white/5 text-slate-600 opacity-50 cursor-not-allowed'
+                        : isSelected
                         ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold shadow-lg shadow-amber-500/20 scale-[1.02]'
                         : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
                     }`}
@@ -547,7 +594,7 @@ export default function ClientBooking() {
                       {day.dayNum}
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      {day.monthShort}
+                      {closed ? 'Fechado' : day.monthShort}
                     </span>
                   </button>
                 );
@@ -560,7 +607,7 @@ export default function ClientBooking() {
             <span className="text-xs text-slate-400">Ou escolha outra data:</span>
             <input
               type="date"
-              min={new Date().toISOString().split('T')[0]}
+              min={toLocalISODate(new Date())}
               value={selectedDate}
               onChange={(e) => {
                 setSelectedDate(e.target.value);
@@ -616,7 +663,9 @@ export default function ClientBooking() {
             {timeSlots.filter(t => t.available).length === 0 && (
               <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center flex items-center justify-center gap-2">
                 <AlertCircle className="w-4 h-4" />
-                Nenhum horário livre nesta data para este barbeiro. Por favor selecione outro dia.
+                {isClosedDay(selectedDate)
+                  ? 'A barbearia não abre aos domingos. Por favor selecione outro dia.'
+                  : 'Nenhum horário livre nesta data para este barbeiro. Por favor selecione outro dia.'}
               </div>
             )}
           </div>
@@ -767,7 +816,8 @@ export default function ClientBooking() {
                 Forma de Pagamento
               </label>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className={`grid grid-cols-1 gap-3 ${ONLINE_PAYMENTS_ENABLED ? 'sm:grid-cols-3' : ''}`}>
+                {ONLINE_PAYMENTS_ENABLED && (<>
                 {/* 1. Carteira Digital do Celular (Apple Pay / Google Pay) */}
                 <button
                   type="button"
@@ -835,6 +885,7 @@ export default function ClientBooking() {
                     </p>
                   </div>
                 </button>
+                </>)}
 
                 {/* 3. Pagamento no Atendimento */}
                 <button

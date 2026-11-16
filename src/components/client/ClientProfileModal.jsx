@@ -24,6 +24,7 @@ import {
   formatPhone,
   generateWhatsAppLink
 } from '../../utils/formatters';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick }) {
   const {
@@ -67,7 +68,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
   }, [appointments, currentClientPhone]);
 
   const upcomingAppointments = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalISODate(new Date());
     return clientAppointments.filter(apt => {
       if (apt.status === 'cancelado' || apt.status === 'concluido') return false;
       return apt.date >= todayStr;
@@ -75,7 +76,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
   }, [clientAppointments]);
 
   const pastAppointments = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalISODate(new Date());
     return clientAppointments.filter(apt => {
       return apt.status === 'cancelado' || apt.status === 'concluido' || apt.date < todayStr;
     });
@@ -131,7 +132,7 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
   const isWithin2Hours = (apt) => {
     if (apt.status !== 'confirmado' && apt.status !== 'pendente') return false;
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = toLocalISODate(now);
     if (apt.date !== todayStr) return false;
 
     const [h, m] = (apt.time || '').split(':').map(Number);

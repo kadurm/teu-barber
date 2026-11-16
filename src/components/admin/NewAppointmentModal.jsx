@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Calendar, Clock, User, Phone, DollarSign, MessageSquare } from 'lucide-react';
 import { generateWhatsAppLink, createClientConfirmationWhatsAppMessage } from '../../utils/formatters';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function NewAppointmentModal({ isOpen, onClose }) {
   const { barbers, services, shopInfo, addAppointment } = useApp();
@@ -10,7 +11,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
   const [clientPhone, setClientPhone] = useState('');
   const [barberId, setBarberId] = useState(barbers[0]?.id || 'user1');
   const [serviceId, setServiceId] = useState(services[0]?.id || '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(toLocalISODate(new Date()));
   const [time, setTime] = useState('10:00');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');

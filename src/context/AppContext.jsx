@@ -23,6 +23,7 @@ import {
   getSlotId,
   isCollectionEmptyOnServer
 } from '../services/firebase';
+import { toLocalISODate } from '../utils/formatters';
 
 const AppContext = createContext();
 
@@ -61,6 +62,16 @@ const TEAM_PHOTOS = {
 // Foto provisória = vazia, banco de imagens ou caminho que só existe em desenvolvimento
 const isPlaceholderAvatar = (avatar) => typeof avatar !== 'string' || avatar === ''
   || avatar.includes('images.unsplash.com') || avatar.startsWith('/src/');
+
+// Campos da barbearia que podem ser públicos (nunca tokens/chaves de pagamento)
+const PUBLIC_SHOP_FIELDS = [
+  'name', 'phone', 'displayPhone', 'address', 'instagram', 'instagramUrl',
+  'openTime', 'closeTime', 'saturdayOpenTime', 'saturdayCloseTime',
+  'lunchStart', 'lunchEnd', 'slotDurationMinutes'
+];
+const pickPublicShopInfo = (info) => Object.fromEntries(
+  PUBLIC_SHOP_FIELDS.filter(f => info[f] !== undefined).map(f => [f, info[f]])
+);
 
 const withTeamPhoto = (barber) => (TEAM_PHOTOS[barber.id] && isPlaceholderAvatar(barber.avatar))
   ? { ...barber, avatar: TEAM_PHOTOS[barber.id] }
@@ -115,7 +126,11 @@ export function AppProvider({ children }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed.map(b => b.id === 'user1' ? { ...b, role: 'Barbeiro & Proprietário', avatar: SHOP_INFO.logoUrl } : b);
+        // Logo antigo salvo como foto do Teu também é tratado como provisório
+        return parsed.map(b => {
+          const fixed = b.id === 'user1' ? { ...b, role: 'Barbeiro & Proprietário' } : b;
+          return fixed.avatar === SHOP_INFO.logoUrl ? withTeamPhoto({ ...fixed, avatar: '' }) : withTeamPhoto(fixed);
+        });
       } catch (e) {
         return BARBERS;
       }
@@ -168,6 +183,22 @@ export function AppProvider({ children }) {
   // Horários ocupados publicados na nuvem (sem dados do cliente)
   const [occupiedSlots, setOccupiedSlots] = useState([]);
 
+  // Dados da barbearia editados no painel são publicados em /public_settings/shop
+  // para chegarem ao site de todos os clientes (antes ficavam só no navegador de quem editou).
+  const shopInfoRef = useRef(shopInfo);
+  shopInfoRef.current = shopInfo;
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
+
+  const updateShopInfo = useCallback((updater) => {
+    const next = typeof updater === 'function' ? updater(shopInfoRef.current) : updater;
+    shopInfoRef.current = next;
+    setShopInfo(next);
+    if (isFirebaseConfigured() && isAdminRef.current) {
+      saveFirestoreDoc('public_settings', 'shop', pickPublicShopInfo(next), { merge: false });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isFirebaseConfigured()) {
       setAuthLoading(false);
@@ -216,8 +247,17 @@ export function AppProvider({ children }) {
       }
     });
 
+    const unsubShop = subscribeToCollection('public_settings', (docs) => {
+      const shopDoc = Array.isArray(docs) ? docs.find(d => d.id === 'shop') : null;
+      if (shopDoc) {
+        const { id, ...data } = shopDoc;
+        setShopInfo(prev => ({ ...prev, ...pickPublicShopInfo(data), logoUrl: SHOP_INFO.logoUrl }));
+      }
+    });
+
+    // A nuvem é a fonte da verdade: lista vazia também vale (último bloqueio removido)
     const unsubBlocked = subscribeToCollection('blocked_slots', (cloudBlocked) => {
-      if (cloudBlocked && Array.isArray(cloudBlocked) && cloudBlocked.length > 0) {
+      if (Array.isArray(cloudBlocked)) {
         setBlockedSlots(cloudBlocked);
       }
     });
@@ -227,6 +267,7 @@ export function AppProvider({ children }) {
       unsubBarbers();
       unsubServices();
       unsubBlocked();
+      unsubShop();
     };
   }, []);
 
@@ -279,7 +320,7 @@ export function AppProvider({ children }) {
 
     // 4. Escuta financeiro da nuvem
     const unsubFinancial = subscribeToCollection('financial', (cloudFin) => {
-      if (cloudFin && Array.isArray(cloudFin) && cloudFin.length > 0) {
+      if (Array.isArray(cloudFin)) {
         setFinancialRecords(cloudFin);
       }
     });
@@ -579,9 +620,13 @@ export function AppProvider({ children }) {
 
     // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
     if (data.clientPhone && data.clientName) {
+      const clean = normalizePhone(data.clientPhone);
+      const existed = clients.some(c => normalizePhone(c.phone) === clean);
       saveClientProfile(data.clientPhone, data.clientName, data.notes || '');
-      const clean = data.clientPhone.replace(/\D/g, '');
-      setClients(prev => prev.map(c => c.phone === clean ? { ...c, totalBookings: (c.totalBookings || 0) + 1 } : c));
+      // Cliente novo já nasce com totalBookings = 1; só soma para quem já existia
+      if (existed) {
+        setClients(prev => prev.map(c => normalizePhone(c.phone) === clean ? { ...c, totalBookings: (c.totalBookings || 0) + 1 } : c));
+      }
     }
 
     return newApt;
@@ -648,7 +693,7 @@ export function AppProvider({ children }) {
     const id = `fin-${Date.now()}`;
     const newRecord = {
       id,
-      date: new Date().toISOString().split('T')[0],
+      date: toLocalISODate(new Date()),
       ...record,
       amount: Number(record.amount)
     };
@@ -793,7 +838,7 @@ export function AppProvider({ children }) {
       rating: '5.0',
       totalReviews: 0,
       active: true,
-      admissionDate: barberData.admissionDate || new Date().toISOString().split('T')[0]
+      admissionDate: barberData.admissionDate || toLocalISODate(new Date())
     };
     setBarbers(prev => [...prev, newBarber]);
     if (isFirebaseConfigured()) {
@@ -951,7 +996,7 @@ export function AppProvider({ children }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `teu-barber-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `teu-barber-backup-${toLocalISODate(new Date())}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -975,7 +1020,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       shopInfo,
-      setShopInfo,
+      setShopInfo: updateShopInfo,
       barbers,
       setBarbers,
       addBarber,

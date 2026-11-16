@@ -17,6 +17,7 @@ import {
   PieChart
 } from 'lucide-react';
 import NewTransactionModal from './NewTransactionModal';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function FinancialTab() {
   const { financialRecords, deleteFinancialRecord, barbers, appointments } = useApp();
@@ -24,7 +25,7 @@ export default function FinancialTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState('all'); // 'all', 'entrada', 'saida'
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toLocalISODate(new Date());
 
   // Financial Metrics
   const metrics = useMemo(() => {

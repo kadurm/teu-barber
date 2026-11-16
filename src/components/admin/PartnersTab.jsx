@@ -7,6 +7,7 @@ import {
   ExternalLink, MessageSquare
 } from 'lucide-react';
 import EditPartnerModal from './EditPartnerModal';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function PartnersTab() {
   const { barbers, appointments, addBarber, updateBarber } = useApp();
@@ -26,7 +27,7 @@ export default function PartnersTab() {
 
   // Helper date boundaries
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = toLocalISODate(today);
 
   const periodDates = useMemo(() => {
     const now = new Date();
@@ -37,19 +38,19 @@ export default function PartnersTab() {
       const d = new Date(now);
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const monday = new Date(d.setDate(diff)).toISOString().split('T')[0];
-      const sunday = new Date(d.setDate(diff + 6)).toISOString().split('T')[0];
+      const monday = toLocalISODate(new Date(d.setDate(diff)));
+      const sunday = toLocalISODate(new Date(d.setDate(diff + 6)));
       return { start: monday, end: sunday, label: 'Esta Semana' };
     }
     if (selectedPeriod === 'month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+      const lastDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
       const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       return { start: firstDay, end: lastDay, label: `Mês de ${monthNames[now.getMonth()]}` };
     }
     if (selectedPeriod === 'last_month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      const firstDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      const lastDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 0));
       return { start: firstDay, end: lastDay, label: 'Mês Passado' };
     }
     if (selectedPeriod === 'custom') {

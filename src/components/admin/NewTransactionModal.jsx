@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, DollarSign, PlusCircle, MinusCircle } from 'lucide-react';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function NewTransactionModal({ isOpen, onClose }) {
   const { barbers, addFinancialRecord } = useApp();
@@ -11,7 +12,7 @@ export default function NewTransactionModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState('');
   const [barberId, setBarberId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(toLocalISODate(new Date()));
 
   if (!isOpen) return null;
 

@@ -23,6 +23,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import NewAppointmentModal from './NewAppointmentModal';
+import { toLocalISODate } from '../../utils/formatters';
 
 export default function AppointmentsTab() {
   const { shopInfo, appointments, updateAppointmentStatus, deleteAppointment, barbers } = useApp();
@@ -31,19 +32,19 @@ export default function AppointmentsTab() {
   const [filterBarber, setFilterBarber] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDateMode, setFilterDateMode] = useState('today'); // 'today', 'tomorrow', 'all', 'custom'
-  const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customDate, setCustomDate] = useState(toLocalISODate(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
 
   // Target date based on mode
   const targetDate = useMemo(() => {
     const today = new Date();
     if (filterDateMode === 'today') {
-      return today.toISOString().split('T')[0];
+      return toLocalISODate(today);
     }
     if (filterDateMode === 'tomorrow') {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
-      return tomorrow.toISOString().split('T')[0];
+      return toLocalISODate(tomorrow);
     }
     if (filterDateMode === 'custom') {
       return customDate;
@@ -214,7 +215,7 @@ export default function AppointmentsTab() {
   const isWithin2Hours = (appointment) => {
     if (appointment.status === 'cancelado' || appointment.status === 'concluido') return false;
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = toLocalISODate(now);
     if (appointment.date !== todayStr) return false;
     const [h, m] = (appointment.time || '').split(':').map(Number);
     if (isNaN(h) || isNaN(m)) return false;
