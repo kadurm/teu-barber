@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import MercadoPagoCheckout from './MercadoPagoCheckout';
 import ClientProfileModal from './ClientProfileModal';
+import BarberCarousel from './BarberCarousel';
 
 export default function ClientBooking() {
   // Device detection for Apple Pay vs Google Pay
@@ -356,64 +357,12 @@ export default function ClientBooking() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-2">
-            {barbers.map(barber => {
-              const isSelected = selectedBarberId === barber.id;
-              return (
-                <div
-                  key={barber.id}
-                  onClick={() => setSelectedBarberId(barber.id)}
-                  className={`p-5 rounded-2xl cursor-pointer transition-all border metallic-card metallic-card-hover ${
-                    isSelected
-                      ? 'border-amber-400/80 ring-2 ring-amber-400/30 bg-gradient-to-b from-slate-900 to-[#1b1e26]'
-                      : 'border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="relative">
-                      <img
-                        src={barber.avatar}
-                        alt={barber.name}
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-600 shadow-md"
-                      />
-                      {isSelected && (
-                        <div className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 p-1 rounded-full shadow-lg">
-                          <Check className="w-3.5 h-3.5 font-bold" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
-                          {barber.name}
-                        </h3>
-                      </div>
-
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">
-                        {barber.role}
-                      </p>
-
-                      <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                        {barber.specialty}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                    <span className="text-slate-400">
-                      Disponível para agendamento
-                    </span>
-                    <span className={`font-semibold flex items-center gap-1 ${
-                      isSelected ? 'text-amber-400' : 'text-slate-400'
-                    }`}>
-                      {isSelected ? 'Selecionado' : 'Clique para escolher'}
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="pt-2">
+            <BarberCarousel
+              barbers={barbers}
+              selectedBarberId={selectedBarberId}
+              onSelect={setSelectedBarberId}
+            />
           </div>
 
           <div className="pt-4 flex justify-end">
