@@ -61,7 +61,7 @@ const TEAM_PHOTOS = {
 
 // Foto provisória = vazia, banco de imagens ou caminho que só existe em desenvolvimento
 const isPlaceholderAvatar = (avatar) => typeof avatar !== 'string' || avatar === ''
-  || avatar.includes('images.unsplash.com') || avatar.startsWith('/src/');
+  || avatar.includes('images.unsplash.com') || avatar.startsWith('/src/') || avatar.includes('/assets/logo');
 
 // Campos da barbearia que podem ser públicos (nunca tokens/chaves de pagamento)
 const PUBLIC_SHOP_FIELDS = [

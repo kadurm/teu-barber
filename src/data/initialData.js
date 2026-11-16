@@ -1,4 +1,4 @@
-import logoImg from '../assets/logo.png';
+import logoImg from '../assets/logo.webp'; // 256px, ~16 KB (o PNG original tinha 640 KB)
 
 export const SHOP_INFO = {
   name: "Teu Barber Studio",

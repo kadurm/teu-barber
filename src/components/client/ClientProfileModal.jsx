@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   X,
@@ -81,6 +81,14 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
       return apt.status === 'cancelado' || apt.status === 'concluido' || apt.date < todayStr;
     });
   }, [clientAppointments]);
+
+  // Tecla Esc fecha a janela
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
