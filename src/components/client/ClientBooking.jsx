@@ -56,7 +56,7 @@ export default function ClientBooking() {
 
   const {
     shopInfo,
-    barbers,
+    barbers: allBarbers,
     services,
     addAppointment,
     isSlotAvailable,
@@ -67,6 +67,9 @@ export default function ClientBooking() {
     lookupClientByPhone,
     logoutClient
   } = useApp();
+
+  // Só parceiros ativos aparecem para agendamento (opção "Parceiro ativo" no painel)
+  const barbers = useMemo(() => allBarbers.filter(b => b.active !== false), [allBarbers]);
 
   // Current wizard step: 1: Barber, 2: Service, 3: DateTime, 4: Client Info, 5: Confirmation
   const [step, setStep] = useState(1);
