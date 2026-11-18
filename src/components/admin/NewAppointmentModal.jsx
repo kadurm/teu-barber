@@ -5,7 +5,7 @@ import { generateWhatsAppLink, createClientConfirmationWhatsAppMessage } from '.
 import { toLocalISODate } from '../../utils/formatters';
 
 export default function NewAppointmentModal({ isOpen, onClose }) {
-  const { barbers, services, shopInfo, addAppointment } = useApp();
+  const { barbers, services, shopInfo, addAppointment, isSlotAvailable } = useApp();
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -19,6 +19,16 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  // Limpa o formulário ao fechar (antes reabria com os dados do último cliente)
+  const handleClose = () => {
+    setClientName('');
+    setClientPhone('');
+    setNotes('');
+    setTime('10:00');
+    setDate(toLocalISODate(new Date()));
+    onClose();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!clientName.trim()) {
@@ -26,8 +36,19 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
       return;
     }
 
-    const selectedBarber = barbers.find(b => b.id === barberId);
-    const selectedService = services.find(s => s.id === serviceId);
+    // Profissional/serviço podem ter mudado depois que o formulário abriu (dados da nuvem)
+    const selectedBarber = barbers.find(b => b.id === barberId) || barbers[0];
+    const selectedService = services.find(s => s.id === serviceId) || services[0];
+    if (!selectedBarber || !selectedService || !date || !time) {
+      alert("Preencha profissional, serviço, data e horário.");
+      return;
+    }
+
+    // Avisa antes de marcar por cima de outro cliente, bloqueio, almoço ou fora do expediente
+    if (!isSlotAvailable(date, time, selectedBarber.id, selectedService.duration)
+      && !window.confirm(`O horário ${time} com ${selectedBarber.name} está ocupado, bloqueado ou fora do expediente. Marcar mesmo assim?`)) {
+      return;
+    }
 
     const newApt = addAppointment({
       clientName: clientName.trim(),
@@ -57,7 +78,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
       }
     }
 
-    onClose();
+    handleClose();
   };
 
   return (
@@ -74,7 +95,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
             </p>
           </div>
           <button 
-            onClick={onClose} 
+            onClick={handleClose} 
             className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"
           >
             <X className="w-5 h-5" />
@@ -203,7 +224,7 @@ export default function NewAppointmentModal({ isOpen, onClose }) {
           <div className="pt-3 flex justify-end gap-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 font-semibold"
             >
               Cancelar

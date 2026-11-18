@@ -376,6 +376,23 @@ export const saveFirestoreDoc = async (collectionName, docId, data, options = { 
   }
 };
 
+// Cria o documento do horário ocupado. As regras só deixam o público CRIAR /slots (nunca sobrescrever),
+// então "permission-denied" significa que outro cliente já reservou esse horário.
+// Retorna 'ok', 'taken' ou 'unknown' (sem conexão a tempo ou outro erro: o agendamento segue normalmente).
+export const reserveSlotDoc = async (slotId, data, timeoutMs = 8000) => {
+  const db = getFirestoreDb();
+  if (!db) return 'unknown';
+  const attempt = setDoc(doc(db, 'slots', String(slotId)), cleanFirestoreData(data))
+    .then(() => 'ok')
+    .catch((err) => {
+      if (err?.code === 'permission-denied') return 'taken';
+      console.error(`Erro ao reservar horário (slots/${slotId}):`, err);
+      return 'unknown';
+    });
+  const timeout = new Promise(resolve => setTimeout(() => resolve('unknown'), timeoutMs));
+  return Promise.race([attempt, timeout]);
+};
+
 // Deleta documento no Firestore
 export const deleteFirestoreDoc = async (collectionName, docId) => {
   const db = getFirestoreDb();

@@ -21,7 +21,8 @@ import {
   splitBarberData,
   PRIVATE_BARBER_FIELDS,
   getSlotId,
-  isCollectionEmptyOnServer
+  isCollectionEmptyOnServer,
+  reserveSlotDoc
 } from '../services/firebase';
 import { toLocalISODate } from '../utils/formatters';
 
@@ -243,7 +244,13 @@ export function AppProvider({ children }) {
 
     const unsubServices = subscribeToCollection('services', (cloudServices) => {
       if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
-        setServices(cloudServices);
+        // A nuvem devolve em ordem alfabética de ID; mantém a ordem do catálogo da barbearia
+        // (Corte primeiro...) e coloca os serviços novos no fim, na ordem em que foram criados
+        const rank = (srv) => {
+          const i = SERVICES.findIndex(d => d.id === srv.id);
+          return i >= 0 ? i : SERVICES.length;
+        };
+        setServices([...cloudServices].sort((a, b) => (rank(a) - rank(b)) || String(a.id).localeCompare(String(b.id))));
       }
     });
 
@@ -276,37 +283,25 @@ export function AppProvider({ children }) {
     if (!isFirebaseConfigured() || !isAdmin) return;
 
     // 1. Escuta agendamentos da nuvem
+    // Para o admin a nuvem é a fonte da verdade: substitui a lista local (antes um agendamento
+    // excluído em outro aparelho continuava aparecendo aqui para sempre). O Firestore já inclui
+    // nas respostas as gravações deste aparelho que ainda estão a caminho do servidor.
     const unsubAppointments = subscribeToCollection('appointments', (cloudAppointments) => {
-      if (cloudAppointments && Array.isArray(cloudAppointments) && cloudAppointments.length > 0) {
-        setAppointments(prev => {
-          const map = new Map();
-          prev.forEach(item => { if (item.id) map.set(item.id, item); });
-          cloudAppointments.forEach(item => { if (item.id) map.set(item.id, item); });
-          return Array.from(map.values()).sort((a, b) => {
-            const dateA = `${a.date || ''} ${a.time || ''}`;
-            const dateB = `${b.date || ''} ${b.time || ''}`;
-            return dateB.localeCompare(dateA);
-          });
-        });
+      if (Array.isArray(cloudAppointments)) {
+        setAppointments([...cloudAppointments].sort((a, b) => {
+          const dateA = `${a.date || ''} ${a.time || ''}`;
+          const dateB = `${b.date || ''} ${b.time || ''}`;
+          return dateB.localeCompare(dateA);
+        }));
       }
     });
 
-    // 2. Escuta clientes da nuvem
     const unsubClients = subscribeToCollection('clients', (cloudClients) => {
-      if (cloudClients && Array.isArray(cloudClients) && cloudClients.length > 0) {
-        setClients(prev => {
-          const map = new Map();
-          prev.forEach(c => { if (c.phone) map.set(c.phone, c); });
-          cloudClients.forEach(c => {
-            const phone = c.phone || c.id;
-            if (phone) map.set(phone, { ...c, phone });
-          });
-          return Array.from(map.values());
-        });
+      if (Array.isArray(cloudClients)) {
+        setClients(cloudClients.map(c => ({ ...c, phone: c.phone || c.id })).filter(c => c.phone));
       }
     });
 
-    // 3. Dados sensíveis dos barbeiros (CPF, PIX, comissão, telefone)
     const unsubBarbersPrivate = subscribeToCollection('barbers_private', (privList) => {
       if (privList && Array.isArray(privList) && privList.length > 0) {
         setBarbers(prev => prev.map(b => {
@@ -325,11 +320,25 @@ export function AppProvider({ children }) {
       }
     });
 
+    // 5. Metas de melhoria do espaço. Nuvem vazia + metas salvas neste navegador: publica as metas locais.
+    let acquisitionsSeeded = false;
+    const unsubAcquisitions = subscribeToCollection('acquisitions', (cloudAcq) => {
+      if (!Array.isArray(cloudAcq)) return;
+      if (cloudAcq.length === 0 && !acquisitionsSeeded && acquisitionsRef.current.length > 0) {
+        acquisitionsSeeded = true;
+        acquisitionsRef.current.forEach(goal => goal.id && saveFirestoreDoc('acquisitions', goal.id, goal, { merge: false }));
+        return;
+      }
+      acquisitionsSeeded = true;
+      setAcquisitions(cloudAcq);
+    });
+
     return () => {
       unsubAppointments();
       unsubClients();
       unsubBarbersPrivate();
       unsubFinancial();
+      unsubAcquisitions();
     };
   }, [isAdmin]);
 
@@ -428,36 +437,42 @@ export function AppProvider({ children }) {
     return clean;
   };
 
-  const saveClientProfile = (phone, name, notes = '') => {
+  // Lista de clientes mais recente (o cadastro é calculado fora do setState: o updater do React
+  // pode rodar depois, e antes disso o cadastro saía "null" e nunca era gravado na nuvem)
+  const clientsRef = useRef(clients);
+  clientsRef.current = clients;
+
+  const CLIENT_CLOUD_FIELDS = ['phone', 'name', 'notes', 'createdAt', 'updatedAt', 'totalBookings'];
+
+  const saveClientProfile = (phone, name, notes = '', { countBooking = false } = {}) => {
     const cleanPhone = normalizePhone(phone);
     if (!cleanPhone) return null;
 
-    let updatedClient = null;
-    setClients(prev => {
-      const existingIdx = prev.findIndex(c => normalizePhone(c.phone) === cleanPhone);
-      if (existingIdx >= 0) {
-        const existing = prev[existingIdx];
-        updatedClient = {
+    const now = new Date().toISOString();
+    const existing = clientsRef.current.find(c => normalizePhone(c.phone) === cleanPhone);
+    const updatedClient = existing
+      ? {
           ...existing,
           phone: cleanPhone,
-          name: name.trim() || existing.name,
-          notes: notes !== undefined ? notes.trim() : existing.notes,
-          updatedAt: new Date().toISOString()
-        };
-        const next = [...prev];
-        next[existingIdx] = updatedClient;
-        return next;
-      } else {
-        updatedClient = {
+          name: (name || '').trim() || existing.name,
+          notes: notes !== undefined && notes !== null ? String(notes).trim() : (existing.notes || ''),
+          updatedAt: now,
+          totalBookings: (existing.totalBookings || 0) + (countBooking ? 1 : 0)
+        }
+      : {
           phone: cleanPhone,
-          name: name.trim(),
-          notes: notes ? notes.trim() : '',
-          createdAt: new Date().toISOString(),
+          name: (name || '').trim(),
+          notes: notes ? String(notes).trim() : '',
+          createdAt: now,
+          updatedAt: now,
           totalBookings: 1
         };
-        return [updatedClient, ...prev];
-      }
-    });
+
+    const nextClients = existing
+      ? clientsRef.current.map(c => normalizePhone(c.phone) === cleanPhone ? updatedClient : c)
+      : [updatedClient, ...clientsRef.current];
+    clientsRef.current = nextClients;
+    setClients(nextClients);
 
     try {
       localStorage.setItem(`teu_barber_client_${cleanPhone}`, JSON.stringify(updatedClient));
@@ -465,8 +480,12 @@ export function AppProvider({ children }) {
       // ignore
     }
 
-    if (isFirebaseConfigured() && updatedClient) {
-      saveFirestoreDoc('clients', cleanPhone, updatedClient);
+    if (isFirebaseConfigured() && updatedClient.name) {
+      // Só os campos aceitos pelas regras do Firestore em /clients
+      const cloudData = Object.fromEntries(
+        CLIENT_CLOUD_FIELDS.filter(f => updatedClient[f] !== undefined).map(f => [f, updatedClient[f]])
+      );
+      saveFirestoreDoc('clients', cleanPhone, cloudData);
     }
 
     setCurrentClientPhone(cleanPhone);
@@ -591,7 +610,22 @@ export function AppProvider({ children }) {
   }, [shopInfo, isAdmin]);
 
   // Appointment Actions
-  const addAppointment = (data) => {
+  // Reserva o horário na nuvem ANTES de confirmar o agendamento do cliente.
+  // O documento /slots tem ID fixo (profissional + data + hora) e o público só pode criá-lo:
+  // se outro cliente reservou o mesmo horário segundos antes, a gravação é negada.
+  // Retorna 'ok', 'taken' ou 'unknown' (sem nuvem, sem resposta a tempo ou outro erro).
+  const reserveSlot = async ({ barberId, date, time, duration }) => {
+    if (!isFirebaseConfigured() || !barberId || !date || !time) return 'unknown';
+    return reserveSlotDoc(getSlotId(barberId, date, time), {
+      barberId,
+      date,
+      time,
+      duration: Number(duration || shopInfo?.slotDurationMinutes || 30),
+      createdAt: new Date().toISOString()
+    });
+  };
+
+  const addAppointment = (data, { slotReserved = false } = {}) => {
     const id = generateAppointmentId();
     const newApt = {
       id,
@@ -607,7 +641,7 @@ export function AppProvider({ children }) {
     if (isFirebaseConfigured()) {
       saveFirestoreDoc('appointments', newApt.id, newApt);
       // Publica só a ocupação do horário (sem nome/telefone) para os outros clientes
-      if (newApt.barberId && newApt.date && newApt.time) {
+      if (!slotReserved && newApt.barberId && newApt.date && newApt.time) {
         saveFirestoreDoc('slots', getSlotId(newApt.barberId, newApt.date, newApt.time), {
           barberId: newApt.barberId,
           date: newApt.date,
@@ -619,14 +653,9 @@ export function AppProvider({ children }) {
     }
 
     // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
+    // (cliente novo nasce com totalBookings = 1; quem já existia soma +1)
     if (data.clientPhone && data.clientName) {
-      const clean = normalizePhone(data.clientPhone);
-      const existed = clients.some(c => normalizePhone(c.phone) === clean);
-      saveClientProfile(data.clientPhone, data.clientName, data.notes || '');
-      // Cliente novo já nasce com totalBookings = 1; só soma para quem já existia
-      if (existed) {
-        setClients(prev => prev.map(c => normalizePhone(c.phone) === clean ? { ...c, totalBookings: (c.totalBookings || 0) + 1 } : c));
-      }
+      saveClientProfile(data.clientPhone, data.clientName, data.notes || '', { countBooking: true });
     }
 
     return newApt;
@@ -712,55 +741,68 @@ export function AppProvider({ children }) {
   };
 
   // Acquisition Goals Actions
+  // Metas de melhoria do espaço: antes ficavam só no navegador de quem cadastrou.
+  // Agora são gravadas em /acquisitions (somente admin) e aparecem em qualquer aparelho do painel.
+  const acquisitionsRef = useRef(acquisitions);
+  acquisitionsRef.current = acquisitions;
+  const saveAcquisitionToCloud = (goal) => {
+    if (isFirebaseConfigured() && isAdminRef.current) saveFirestoreDoc('acquisitions', goal.id, goal, { merge: false });
+  };
+  const replaceAcquisition = (updated) => {
+    acquisitionsRef.current = acquisitionsRef.current.map(item => item.id === updated.id ? updated : item);
+    setAcquisitions(prev => prev.map(item => item.id === updated.id ? updated : item));
+    saveAcquisitionToCloud(updated);
+  };
+
   const addAcquisitionGoal = (goal) => {
     const id = `acq-${Date.now()}`;
     const newGoal = {
       id,
       savedAmount: 0,
       status: 'em_economia',
-      targetCost: Number(goal.targetCost),
-      ...goal
+      ...goal,
+      targetCost: Number(goal.targetCost) || 0,
+      savedAmount: Number(goal.savedAmount) || 0
     };
+    acquisitionsRef.current = [newGoal, ...acquisitionsRef.current];
     setAcquisitions(prev => [newGoal, ...prev]);
+    saveAcquisitionToCloud(newGoal);
     return newGoal;
   };
 
   const updateAcquisitionGoal = (id, updates) => {
-    setAcquisitions(prev => prev.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, ...updates };
-        if (updated.savedAmount >= updated.targetCost) {
-          updated.status = 'adquirido';
-        }
-        return updated;
-      }
-      return item;
-    }));
+    const item = acquisitionsRef.current.find(g => g.id === id);
+    if (!item) return;
+    const updated = { ...item, ...updates };
+    updated.savedAmount = Number(updated.savedAmount) || 0;
+    updated.targetCost = Number(updated.targetCost) || 0;
+    if (updated.targetCost > 0 && updated.savedAmount >= updated.targetCost) {
+      updated.status = 'adquirido';
+    } else if (updates.savedAmount !== undefined || updates.targetCost !== undefined) {
+      // Valor guardado editado para baixo da meta: volta a "em economia"
+      if (updates.status === undefined && item.status === 'adquirido') updated.status = 'em_economia';
+    }
+    replaceAcquisition(updated);
   };
 
   const contributeToAcquisition = (goalId, amount, deductFromCashFlow = false) => {
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) return;
 
-    setAcquisitions(prev => prev.map(item => {
-      if (item.id === goalId) {
-        const newSaved = item.savedAmount + numAmount;
-        const newStatus = newSaved >= item.targetCost ? 'adquirido' : 'em_economia';
-        return {
-          ...item,
-          savedAmount: newSaved,
-          status: newStatus
-        };
-      }
-      return item;
-    }));
+    const item = acquisitionsRef.current.find(g => g.id === goalId);
+    if (!item) return;
+    const newSaved = (Number(item.savedAmount) || 0) + numAmount;
+    replaceAcquisition({
+      ...item,
+      savedAmount: newSaved,
+      status: newSaved >= (Number(item.targetCost) || 0) ? 'adquirido' : 'em_economia'
+    });
 
     if (deductFromCashFlow) {
-      const targetGoal = acquisitions.find(g => g.id === goalId);
       addFinancialRecord({
         type: 'saida',
         category: 'Melhoria do Espaço',
-        description: `Aporte Meta: ${targetGoal ? targetGoal.title : 'Melhoria'}`,
+        description: `Aporte Meta: ${item.title || 'Melhoria'}`,
         amount: numAmount,
         paymentMethod: 'reserva'
       });
@@ -768,26 +810,32 @@ export function AppProvider({ children }) {
   };
 
   const deleteAcquisitionGoal = (id) => {
+    acquisitionsRef.current = acquisitionsRef.current.filter(item => item.id !== id);
     setAcquisitions(prev => prev.filter(item => item.id !== id));
+    if (isFirebaseConfigured() && isAdminRef.current) deleteFirestoreDoc('acquisitions', id);
   };
 
   // Blocked Slots Actions
+  // Efeitos na nuvem ficam fora do setState (em modo estrito o React roda o updater duas vezes)
+  const blockedSlotsRef = useRef(blockedSlots);
+  blockedSlotsRef.current = blockedSlots;
   const toggleBlockedSlot = (date, time, barberId, reason = "Horário Bloqueado") => {
-    setBlockedSlots(prev => {
-      const exists = prev.find(b => b.date === date && b.time === time && b.barberId === barberId);
-      if (exists) {
-        if (isFirebaseConfigured() && exists.id) {
-          deleteFirestoreDoc('blocked_slots', exists.id);
-        }
-        return prev.filter(b => !(b.date === date && b.time === time && b.barberId === barberId));
-      } else {
-        const newSlot = { date, time, barberId, reason, id: `blk-${Date.now()}` };
-        if (isFirebaseConfigured()) {
-          saveFirestoreDoc('blocked_slots', newSlot.id, newSlot);
-        }
-        return [...prev, newSlot];
+    const matches = (b) => b.date === date && b.time === time && b.barberId === barberId;
+    const exists = blockedSlotsRef.current.find(matches);
+    if (exists) {
+      if (isFirebaseConfigured() && exists.id) {
+        deleteFirestoreDoc('blocked_slots', exists.id);
       }
-    });
+      blockedSlotsRef.current = blockedSlotsRef.current.filter(b => !matches(b));
+      setBlockedSlots(prev => prev.filter(b => !matches(b)));
+    } else {
+      const newSlot = { date, time, barberId, reason, id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
+      if (isFirebaseConfigured()) {
+        saveFirestoreDoc('blocked_slots', newSlot.id, newSlot);
+      }
+      blockedSlotsRef.current = [...blockedSlotsRef.current, newSlot];
+      setBlockedSlots(prev => prev.some(matches) ? prev : [...prev, newSlot]);
+    }
   };
 
   // Service Management Actions
@@ -837,7 +885,7 @@ export function AppProvider({ children }) {
       bio: barberData.bio || '',
       rating: '5.0',
       totalReviews: 0,
-      active: true,
+      active: barberData.active !== false, // respeita "Parceiro ativo" desmarcado no cadastro
       admissionDate: barberData.admissionDate || toLocalISODate(new Date())
     };
     setBarbers(prev => [...prev, newBarber]);
@@ -1040,6 +1088,7 @@ export function AppProvider({ children }) {
       reminder2hNotification,
       setReminder2hNotification,
       addAppointment,
+      reserveSlot,
       updateAppointmentStatus,
       deleteAppointment,
       addFinancialRecord,

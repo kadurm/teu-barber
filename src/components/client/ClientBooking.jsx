@@ -42,9 +42,28 @@ import { toLocalISODate } from '../../utils/formatters';
 const ONLINE_PAYMENTS_ENABLED = false;
 
 const SUNDAY = 0;
-const isClosedDay = (isoDate) => {
+const SATURDAY = 6;
+const weekdayOf = (isoDate) => {
   const [y, m, d] = (isoDate || '').split('-').map(Number);
-  return !y ? false : new Date(y, m - 1, d).getDay() === SUNDAY;
+  return !y ? null : new Date(y, m - 1, d).getDay();
+};
+const isClosedDay = (isoDate) => weekdayOf(isoDate) === SUNDAY;
+const toMinutes = (hhmm) => {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+// Expediente do dia: sábado tem horário próprio (antes a grade de sábado mostrava 18:00–19:30 como "Ocupado")
+const getDayHours = (shopInfo, isoDate) => weekdayOf(isoDate) === SATURDAY
+  ? { open: shopInfo.saturdayOpenTime || '09:00', close: shopInfo.saturdayCloseTime || '18:00' }
+  : { open: shopInfo.openTime || '09:00', close: shopInfo.closeTime || '20:00' };
+
+const CATEGORY_LABELS = {
+  cabelo: 'Cabelo',
+  barba: 'Barba',
+  combos: 'Combos',
+  quimica: 'Química & Cores',
+  estetica: 'Estética'
 };
 
 export default function ClientBooking() {
@@ -61,6 +80,7 @@ export default function ClientBooking() {
     addAppointment,
     isSlotAvailable,
     updateAppointmentStatus,
+    reserveSlot,
     clients,
     currentClientPhone,
     getClientByPhone,
@@ -100,6 +120,7 @@ export default function ClientBooking() {
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [pendingBooking, setPendingBooking] = useState(null);
   const [copiedMessage, setCopiedMessage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Selected Barber object
   const selectedBarber = useMemo(() => {
@@ -133,35 +154,48 @@ export default function ClientBooking() {
     return days;
   }, []);
 
+  // Data escolhida já passou (o calendário deixa digitar datas antigas)
+  const isPastDate = Boolean(selectedDate) && selectedDate < toLocalISODate(new Date());
+
   // Time slots generated for selected date and barber
   const timeSlots = useMemo(() => {
+    if (!selectedDate || isPastDate || isClosedDay(selectedDate) || !selectedBarber) return [];
+
+    const { open, close } = getDayHours(shopInfo, selectedDate);
     const allSlots = generateTimeSlots(
-      shopInfo.openTime,
-      shopInfo.closeTime,
+      open,
+      close,
       shopInfo.slotDurationMinutes,
       shopInfo.lunchStart,
       shopInfo.lunchEnd
     );
-
-    if (isClosedDay(selectedDate)) return [];
 
     // Hoje: esconde horários que já passaram
     const now = new Date();
     const isToday = selectedDate === toLocalISODate(now);
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    return allSlots.filter(time => {
-      if (!isToday) return true;
-      const [h, m] = time.split(':').map(Number);
-      return h * 60 + m > nowMinutes;
-    }).map(time => {
-      const available = isSlotAvailable(selectedDate, time, selectedBarberId, selectedService?.duration);
-      return {
+    // Horários em que o serviço não cabe no expediente (passaria do almoço ou do fechamento)
+    // ficam fora da grade; "Ocupado" aparece só para horário realmente reservado ou bloqueado.
+    const duration = Number(selectedService?.duration) || Number(shopInfo.slotDurationMinutes) || 30;
+    const closeMin = toMinutes(close);
+    const lunchStartMin = shopInfo.lunchStart ? toMinutes(shopInfo.lunchStart) : null;
+    const lunchEndMin = shopInfo.lunchEnd ? toMinutes(shopInfo.lunchEnd) : null;
+    const fitsSchedule = (start) => {
+      const end = start + duration;
+      if (end > closeMin) return false;
+      if (lunchStartMin !== null && lunchEndMin > lunchStartMin && start < lunchEndMin && lunchStartMin < end) return false;
+      return true;
+    };
+
+    return allSlots
+      .filter(time => fitsSchedule(toMinutes(time)))
+      .filter(time => !isToday || toMinutes(time) > nowMinutes)
+      .map(time => ({
         time,
-        available
-      };
-    });
-  }, [shopInfo, selectedDate, selectedBarberId, selectedService, isSlotAvailable]);
+        available: isSlotAvailable(selectedDate, time, selectedBarber.id, selectedService?.duration)
+      }));
+  }, [shopInfo, selectedDate, isPastDate, selectedBarber, selectedService, isSlotAvailable]);
 
   // Trocar profissional ou serviço invalida o horário escolhido antes
   useEffect(() => {
@@ -169,17 +203,17 @@ export default function ClientBooking() {
   }, [selectedBarberId, selectedServiceId]);
 
   // Auto pre-fill if client is already known on this device
-  useEffect(() => {
-    if (currentClientPhone) {
-      const found = getClientByPhone(currentClientPhone);
-      if (found) {
-        setClientPhone(found.phone);
-        setClientName(found.name);
-        if (found.notes) setNotes(found.notes);
-        setAutoRecognizedClient(found);
-      }
+  const prefillKnownClient = () => {
+    if (!currentClientPhone) return;
+    const found = getClientByPhone(currentClientPhone);
+    if (found) {
+      setClientPhone(found.phone);
+      setClientName(found.name);
+      if (found.notes) setNotes(found.notes);
+      setAutoRecognizedClient(found);
     }
-  }, [currentClientPhone]);
+  };
+  useEffect(prefillKnownClient, [currentClientPhone]);
 
   // Busca local + nuvem (leitura por ID); ignora respostas de números já alterados
   const latestLookupRef = useRef('');
@@ -218,8 +252,9 @@ export default function ClientBooking() {
   };
 
   // Submit appointment
-  const handleConfirmBooking = (e) => {
+  const handleConfirmBooking = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!clientName.trim()) {
       alert("Por favor, digite seu nome completo.");
@@ -230,17 +265,21 @@ export default function ClientBooking() {
       return;
     }
 
+    const backToTimes = (msg) => {
+      alert(msg);
+      setSelectedTime('');
+      setStep(3);
+    };
+
     // Revalida: o horário pode ter sido ocupado por outro cliente, já ter passado
     // ou não comportar o serviço (se o cliente voltou e trocou de serviço/profissional)
     const [h, m] = (selectedTime || '').split(':').map(Number);
     const now = new Date();
     const isPast = selectedDate < toLocalISODate(now)
       || (selectedDate === toLocalISODate(now) && h * 60 + m <= now.getHours() * 60 + now.getMinutes());
-    if (!selectedService || !selectedTime || isPast || isClosedDay(selectedDate)
+    if (!selectedBarber || !selectedService || !selectedTime || isPast || isClosedDay(selectedDate)
       || !isSlotAvailable(selectedDate, selectedTime, selectedBarber.id, selectedService.duration)) {
-      alert("Esse horário não está mais disponível. Escolha outro horário, por favor.");
-      setSelectedTime('');
-      setStep(3);
+      backToTimes("Esse horário não está mais disponível. Escolha outro horário, por favor.");
       return;
     }
 
@@ -263,27 +302,56 @@ export default function ClientBooking() {
       // Quando o pagamento for online, o agendamento só é confirmado APÓS a aprovação no Mercado Pago / Carteira
       setPendingBooking(bookingPayload);
       setShowMercadoPagoModal(true);
-    } else {
-      // Pagamento presencial no local: confirma imediatamente
-      const savedBooking = addAppointment({
-        ...bookingPayload,
-        status: 'confirmado',
-        paymentMethod: 'No Atendimento (Presencial)'
-      });
-      setConfirmedBooking(savedBooking);
-
-      const whatsAppUrl = generateWhatsAppLink(
-        shopInfo.phone,
-        createBookingWhatsAppMessage(savedBooking, shopInfo)
-      );
-
-      try {
-        window.open(whatsAppUrl, '_blank');
-      } catch (err) {
-        console.error('Popup do WhatsApp bloqueado', err);
-      }
-      setStep(5);
+      return;
     }
+
+    // Pagamento presencial no local.
+    // A aba do WhatsApp é aberta já no clique (depois de esperar a nuvem o navegador bloquearia o pop-up)
+    // e só recebe o endereço quando o horário estiver garantido.
+    let whatsAppWindow = null;
+    try {
+      whatsAppWindow = window.open('', '_blank');
+    } catch (err) {
+      whatsAppWindow = null;
+    }
+
+    setIsSubmitting(true);
+    let reservation = 'unknown';
+    try {
+      // Garante o horário na nuvem: se outro cliente acabou de reservar o mesmo horário, não confirma
+      reservation = await reserveSlot(bookingPayload);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    if (reservation === 'taken') {
+      try { whatsAppWindow?.close(); } catch (err) { /* ignore */ }
+      backToTimes("Esse horário acabou de ser reservado por outro cliente. Escolha outro horário, por favor.");
+      return;
+    }
+
+    const savedBooking = addAppointment({
+      ...bookingPayload,
+      status: 'confirmado',
+      paymentMethod: 'No Atendimento (Presencial)'
+    }, { slotReserved: reservation === 'ok' });
+    setConfirmedBooking(savedBooking);
+
+    const whatsAppUrl = generateWhatsAppLink(
+      shopInfo.phone,
+      createBookingWhatsAppMessage(savedBooking, shopInfo)
+    );
+
+    try {
+      if (whatsAppWindow && !whatsAppWindow.closed) {
+        whatsAppWindow.location.href = whatsAppUrl;
+      } else {
+        window.open(whatsAppUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Popup do WhatsApp bloqueado', err);
+    }
+    setStep(5);
   };
 
   // Reset booking form
@@ -296,7 +364,10 @@ export default function ClientBooking() {
     setConfirmedBooking(null);
     setPendingBooking(null);
     setShowMercadoPagoModal(false);
+    setAutoRecognizedClient(null);
     setStep(1);
+    // Cliente já identificado neste aparelho continua com os dados preenchidos
+    prefillKnownClient();
   };
 
   return (
@@ -343,7 +414,7 @@ export default function ClientBooking() {
           </a>
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
             <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>
+            <span>Seg a Sex: {shopInfo.openTime || '09:00'} às {shopInfo.closeTime || '20:00'} • Sáb: {shopInfo.saturdayOpenTime || '09:00'} às {shopInfo.saturdayCloseTime || '18:00'}</span>
           </span>
         </div>
       </div>
@@ -405,15 +476,16 @@ export default function ClientBooking() {
           <div className="pt-2">
             <BarberCarousel
               barbers={barbers}
-              selectedBarberId={selectedBarberId}
+              selectedBarberId={selectedBarber?.id}
               onSelect={setSelectedBarberId}
             />
           </div>
 
           <div className="pt-4 flex justify-end">
             <button
+              disabled={!selectedBarber}
               onClick={() => setStep(2)}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all text-sm uppercase tracking-wider"
+              className="w-full sm:w-auto disabled:opacity-60 disabled:cursor-not-allowed px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all text-sm uppercase tracking-wider"
             >
               <span>Avançar para Serviços</span>
               <ArrowRight className="w-4 h-4" />
@@ -509,7 +581,7 @@ export default function ClientBooking() {
 
                   <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
                     <span className="text-slate-400 text-[11px]">
-                      {service.category.toUpperCase()}
+                      {(CATEGORY_LABELS[service.category] || service.category || '').toUpperCase()}
                     </span>
                     <span className={`font-semibold text-xs flex items-center gap-1 ${
                       isSelected ? 'text-amber-400' : 'text-slate-400'
@@ -666,7 +738,11 @@ export default function ClientBooking() {
             {timeSlots.filter(t => t.available).length === 0 && (
               <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center flex items-center justify-center gap-2">
                 <AlertCircle className="w-4 h-4" />
-                {isClosedDay(selectedDate)
+                {!selectedDate
+                  ? 'Escolha uma data para ver os horários livres.'
+                  : isPastDate
+                  ? 'Essa data já passou. Por favor selecione outro dia.'
+                  : isClosedDay(selectedDate)
                   ? 'A barbearia não abre aos domingos. Por favor selecione outro dia.'
                   : 'Nenhum horário livre nesta data para este barbeiro. Por favor selecione outro dia.'}
               </div>
@@ -945,10 +1021,13 @@ export default function ClientBooking() {
 
             <button
               type="submit"
-              className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className={`px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all ${
+                isSubmitting ? 'opacity-60 cursor-wait' : 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+              }`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Finalizar Agendamento</span>
+              <span>{isSubmitting ? 'Reservando horário...' : 'Finalizar Agendamento'}</span>
             </button>
           </div>
         </form>
@@ -1027,9 +1106,14 @@ export default function ClientBooking() {
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(createBookingWhatsAppMessage(confirmedBooking, shopInfo));
-                    setCopiedMessage(true);
-                    setTimeout(() => setCopiedMessage(false), 2000);
+                    const text = createBookingWhatsAppMessage(confirmedBooking, shopInfo);
+                    Promise.resolve()
+                      .then(() => navigator.clipboard.writeText(text))
+                      .then(() => {
+                        setCopiedMessage(true);
+                        setTimeout(() => setCopiedMessage(false), 2000);
+                      })
+                      .catch(() => alert('Não foi possível copiar automaticamente. Selecione o texto da mensagem e copie.'));
                   }}
                   className="text-[11px] font-semibold text-slate-300 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
                 >

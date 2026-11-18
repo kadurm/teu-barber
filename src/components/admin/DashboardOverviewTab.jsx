@@ -575,7 +575,7 @@ export default function DashboardOverviewTab({ onNavigateTab, onOpenNewAppointme
                         ? 'bg-blue-500/20 text-blue-300'
                         : 'bg-amber-500/20 text-amber-300'
                     }`}>
-                      {apt.status}
+                      {{ concluido: 'Concluído', confirmado: 'Confirmado', pendente: 'Pendente', cancelado: 'Cancelado' }[apt.status] || apt.status}
                     </span>
                   </div>
                 </div>

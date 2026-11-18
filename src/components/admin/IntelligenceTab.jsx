@@ -167,18 +167,36 @@ export default function IntelligenceTab() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
-  // Weekly Demand Distribution (Barbershop Intelligence)
+  // Movimento por dia da semana calculado com os agendamentos reais
+  // (antes era um texto fixo que dizia "Segunda: Fechado / Folga", mas a barbearia abre na segunda)
   const weeklyDemand = useMemo(() => {
     const days = [
-      { name: 'Segunda', status: 'Fechado / Folga', level: 'low', tip: 'Dia de descanso e manutenção de maquinários' },
-      { name: 'Terça-Feira', status: 'Movimento Moderado (35%)', level: 'medium-low', tip: 'Ideal para lançar promoções da "Terça da Barba" e atrair clientes' },
-      { name: 'Quarta-Feira', status: 'Movimento Moderado (45%)', level: 'medium-low', tip: 'Bom dia para serviços mais demorados como Platinados e Selagem' },
-      { name: 'Quinta-Feira', status: 'Movimento Crescente (65%)', level: 'medium-high', tip: 'Início do esquenta do final de semana. Agenda começa a preencher' },
-      { name: 'Sexta-Feira', status: 'Pico de Demanda (95%)', level: 'high', tip: 'Priorizar combos e serviços de alto ticket. Evitar atrasos' },
-      { name: 'Sábado', status: 'Capacidade Máxima (100%)', level: 'high', tip: 'Dia mais rentável da semana. Incentivar agendamentos online' },
+      { dow: 1, name: 'Segunda-Feira', tip: 'Início da semana: bom dia para divulgar horários livres no WhatsApp e no Instagram' },
+      { dow: 2, name: 'Terça-Feira', tip: 'Ideal para lançar promoções da "Terça da Barba" e atrair clientes' },
+      { dow: 3, name: 'Quarta-Feira', tip: 'Bom dia para serviços mais demorados como Platinados e Selagem' },
+      { dow: 4, name: 'Quinta-Feira', tip: 'Início do esquenta do final de semana. Agenda começa a preencher' },
+      { dow: 5, name: 'Sexta-Feira', tip: 'Priorizar combos e serviços de alto ticket. Evitar atrasos' },
+      { dow: 6, name: 'Sábado', tip: 'Expediente mais curto: incentive o agendamento online com antecedência' },
     ];
-    return days;
-  }, []);
+    const counts = {};
+    appointments.forEach(apt => {
+      if (apt.status === 'cancelado' || !apt.date) return;
+      const [y, m, d] = apt.date.split('-').map(Number);
+      if (!y) return;
+      const dow = new Date(y, m - 1, d).getDay();
+      counts[dow] = (counts[dow] || 0) + 1;
+    });
+    const max = Math.max(0, ...days.map(d => counts[d.dow] || 0));
+    return days.map(d => {
+      const n = counts[d.dow] || 0;
+      const pct = max > 0 ? Math.round((n / max) * 100) : 0;
+      const level = max === 0 ? 'low' : pct >= 85 ? 'high' : pct >= 60 ? 'medium-high' : pct >= 30 ? 'medium-low' : 'low';
+      const status = max === 0
+        ? 'Sem agendamentos ainda'
+        : `${n} agendamento${n === 1 ? '' : 's'} (${pct}% do dia mais cheio)`;
+      return { ...d, status, level };
+    });
+  }, [appointments]);
 
   return (
     <div className="space-y-8">

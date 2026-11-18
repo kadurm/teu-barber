@@ -110,7 +110,7 @@ function AppContent() {
                 </a>
 
                 <div>
-                  <span>Seg a Sex: 09:00 às 20:00 • Sáb: 09:00 às 18:00</span>
+                  <span>Seg a Sex: {shopInfo.openTime || '09:00'} às {shopInfo.closeTime || '20:00'} • Sáb: {shopInfo.saturdayOpenTime || '09:00'} às {shopInfo.saturdayCloseTime || '18:00'}</span>
                 </div>
               </div>
 

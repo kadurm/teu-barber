@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatPhone } from '../../utils/formatters';
 import {
@@ -44,6 +44,15 @@ export default function SettingsTab() {
   const [shopPhone, setShopPhone] = useState(shopInfo.displayPhone || formatPhone(shopInfo.phone) || '(38) 99121-8119');
   const [shopAddress, setShopAddress] = useState(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
   const [shopInstagram, setShopInstagram] = useState(shopInfo.instagram || '@teu_barber.studio');
+
+  // Dados da nuvem podem chegar depois que a aba abriu: mantém o formulário atualizado
+  // (antes, salvar com o formulário desatualizado sobrescrevia o que estava publicado)
+  useEffect(() => {
+    setShopName(shopInfo.name);
+    setShopPhone(shopInfo.displayPhone || formatPhone(shopInfo.phone) || '(38) 99121-8119');
+    setShopAddress(shopInfo.address || 'Rua dos Mangabeiras, Sagrada Família, Montes Claros - MG, CEP 39401-018');
+    setShopInstagram(shopInfo.instagram || '@teu_barber.studio');
+  }, [shopInfo.name, shopInfo.displayPhone, shopInfo.phone, shopInfo.address, shopInfo.instagram]);
   const [shopSavedSuccess, setShopSavedSuccess] = useState(false);
 
   const handleAddService = (e) => {

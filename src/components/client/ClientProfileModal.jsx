@@ -67,20 +67,26 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
     });
   }, [appointments, currentClientPhone]);
 
+  // Horário de hoje que já passou vai para o histórico (antes continuava em "Próximos" com botão de desmarcar)
+  const isPastAppointment = (apt) => {
+    const now = new Date();
+    const todayStr = toLocalISODate(now);
+    if (apt.date !== todayStr) return apt.date < todayStr;
+    const [h, m] = String(apt.time || '').split(':').map(Number);
+    return (h || 0) * 60 + (m || 0) <= now.getHours() * 60 + now.getMinutes();
+  };
+
   const upcomingAppointments = useMemo(() => {
-    const todayStr = toLocalISODate(new Date());
-    return clientAppointments.filter(apt => {
-      if (apt.status === 'cancelado' || apt.status === 'concluido') return false;
-      return apt.date >= todayStr;
-    });
-  }, [clientAppointments]);
+    return clientAppointments
+      .filter(apt => apt.status !== 'cancelado' && apt.status !== 'concluido' && !isPastAppointment(apt))
+      .reverse(); // o mais próximo primeiro
+  }, [clientAppointments, isOpen]);
 
   const pastAppointments = useMemo(() => {
-    const todayStr = toLocalISODate(new Date());
-    return clientAppointments.filter(apt => {
-      return apt.status === 'cancelado' || apt.status === 'concluido' || apt.date < todayStr;
-    });
-  }, [clientAppointments]);
+    return clientAppointments.filter(apt =>
+      apt.status === 'cancelado' || apt.status === 'concluido' || isPastAppointment(apt)
+    );
+  }, [clientAppointments, isOpen]); // recalcula ao abrir: o relógio andou desde a última vez
 
   // Tecla Esc fecha a janela
   useEffect(() => {
@@ -94,8 +100,10 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
 
   const handlePhoneLookup = async (e) => {
     e.preventDefault();
-    const clean = inputPhone.replace(/\D/g, '');
-    if (clean.length < 10) {
+    let clean = inputPhone.replace(/\D/g, '');
+    // Número digitado com +55 é o mesmo cadastro (a chave é DDD + número)
+    if (clean.startsWith('55') && clean.length >= 12) clean = clean.slice(2);
+    if (clean.length < 10 || clean.length > 11) {
       setSearchError('Por favor, informe seu WhatsApp completo com DDD (ex: 38 99121-8119).');
       return;
     }
@@ -154,7 +162,10 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
       <div 
         className="w-full max-w-2xl bg-[#111317] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
@@ -309,7 +320,8 @@ export default function ClientProfileModal({ isOpen, onClose, onNewBookingClick 
                   <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
                     <span className="text-zinc-500 block text-[10px] uppercase font-bold">Atendimentos</span>
                     <span className="text-white font-bold text-sm">
-                      {clientAppointments.length} agendamento(s)
+                      {/* Neste aparelho só existem os agendamentos feitos nele; o cadastro na nuvem guarda o total */}
+                      {Math.max(clientAppointments.length, Number(currentClient.totalBookings) || 0)} agendamento(s)
                     </span>
                   </div>
 
