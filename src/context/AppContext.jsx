@@ -793,22 +793,26 @@ export function AppProvider({ children }) {
   };
 
   // Blocked Slots Actions
+  // Efeitos na nuvem ficam fora do setState (em modo estrito o React roda o updater duas vezes)
+  const blockedSlotsRef = useRef(blockedSlots);
+  blockedSlotsRef.current = blockedSlots;
   const toggleBlockedSlot = (date, time, barberId, reason = "Horário Bloqueado") => {
-    setBlockedSlots(prev => {
-      const exists = prev.find(b => b.date === date && b.time === time && b.barberId === barberId);
-      if (exists) {
-        if (isFirebaseConfigured() && exists.id) {
-          deleteFirestoreDoc('blocked_slots', exists.id);
-        }
-        return prev.filter(b => !(b.date === date && b.time === time && b.barberId === barberId));
-      } else {
-        const newSlot = { date, time, barberId, reason, id: `blk-${Date.now()}` };
-        if (isFirebaseConfigured()) {
-          saveFirestoreDoc('blocked_slots', newSlot.id, newSlot);
-        }
-        return [...prev, newSlot];
+    const matches = (b) => b.date === date && b.time === time && b.barberId === barberId;
+    const exists = blockedSlotsRef.current.find(matches);
+    if (exists) {
+      if (isFirebaseConfigured() && exists.id) {
+        deleteFirestoreDoc('blocked_slots', exists.id);
       }
-    });
+      blockedSlotsRef.current = blockedSlotsRef.current.filter(b => !matches(b));
+      setBlockedSlots(prev => prev.filter(b => !matches(b)));
+    } else {
+      const newSlot = { date, time, barberId, reason, id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
+      if (isFirebaseConfigured()) {
+        saveFirestoreDoc('blocked_slots', newSlot.id, newSlot);
+      }
+      blockedSlotsRef.current = [...blockedSlotsRef.current, newSlot];
+      setBlockedSlots(prev => prev.some(matches) ? prev : [...prev, newSlot]);
+    }
   };
 
   // Service Management Actions

@@ -34,6 +34,8 @@ export default function AppointmentsTab() {
   const [filterDateMode, setFilterDateMode] = useState('today'); // 'today', 'tomorrow', 'all', 'custom'
   const [customDate, setCustomDate] = useState(toLocalISODate(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
+  // Agendamento sendo concluído: pergunta a forma de pagamento antes de lançar no caixa
+  const [concludingId, setConcludingId] = useState(null);
 
   // Target date based on mode
   const targetDate = useMemo(() => {
@@ -66,19 +68,21 @@ export default function AppointmentsTab() {
 
       // Search term
       if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
-        const matchName = apt.clientName.toLowerCase().includes(q);
-        const matchPhone = apt.clientPhone.includes(q);
-        const matchService = apt.serviceName.toLowerCase().includes(q);
-        const matchId = apt.id.toLowerCase().includes(q);
+        const q = searchTerm.trim().toLowerCase();
+        const qDigits = q.replace(/\D/g, '');
+        const matchName = String(apt.clientName || '').toLowerCase().includes(q);
+        // Telefone digitado com máscara, espaço ou +55 também encontra
+        const matchPhone = qDigits.length >= 3 && String(apt.clientPhone || '').replace(/\D/g, '').includes(qDigits.replace(/^55(?=\d{10,11}$)/, ''));
+        const matchService = String(apt.serviceName || '').toLowerCase().includes(q);
+        const matchId = String(apt.id || '').toLowerCase().includes(q);
         if (!matchName && !matchPhone && !matchService && !matchId) return false;
       }
 
       return true;
     }).sort((a, b) => {
       // Sort by date then time
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.time.localeCompare(b.time);
+      if (a.date !== b.date) return String(a.date || '').localeCompare(String(b.date || ''));
+      return String(a.time || '').localeCompare(String(b.time || ''));
     });
   }, [appointments, targetDate, filterBarber, filterStatus, searchTerm]);
 
@@ -337,9 +341,38 @@ export default function AppointmentsTab() {
                     )}
 
                     {/* Mark as Finished (Auto triggers Cash Flow Entry) */}
-                    {!isFinished && !isCancelled && (
+                    {!isFinished && !isCancelled && concludingId === apt.id && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400">Pago com:</span>
+                        {[
+                          { id: 'pix', label: 'Pix' },
+                          { id: 'dinheiro', label: 'Dinheiro' },
+                          { id: 'cartao', label: 'Cartão' }
+                        ].map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              updateAppointmentStatus(apt.id, 'concluido', m.id);
+                              setConcludingId(null);
+                            }}
+                            className="px-2.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setConcludingId(null)}
+                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs"
+                          title="Voltar"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {!isFinished && !isCancelled && concludingId !== apt.id && (
                       <button
-                        onClick={() => updateAppointmentStatus(apt.id, 'concluido')}
+                        onClick={() => setConcludingId(apt.id)}
                         className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
                         title="Concluir atendimento e lançar no Caixa"
                       >
@@ -349,9 +382,13 @@ export default function AppointmentsTab() {
                     )}
 
                     {/* Cancel appointment */}
-                    {!isFinished && !isCancelled && (
+                    {!isFinished && !isCancelled && concludingId !== apt.id && (
                       <button
-                        onClick={() => updateAppointmentStatus(apt.id, 'cancelado')}
+                        onClick={() => {
+                          if (window.confirm(`Cancelar o agendamento de ${apt.clientName} (${apt.time})?`)) {
+                            updateAppointmentStatus(apt.id, 'cancelado');
+                          }
+                        }}
                         className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 text-xs transition-all"
                         title="Cancelar Agendamento"
                       >

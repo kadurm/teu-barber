@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatDateBR, generateTimeSlots } from '../../utils/formatters';
 import {
@@ -26,29 +26,65 @@ export default function ScheduleTab() {
   const [lunchStart, setLunchStart] = useState(shopInfo.lunchStart);
   const [lunchEnd, setLunchEnd] = useState(shopInfo.lunchEnd);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(shopInfo.slotDurationMinutes);
+  const [saturdayOpenTime, setSaturdayOpenTime] = useState(shopInfo.saturdayOpenTime || '09:00');
+  const [saturdayCloseTime, setSaturdayCloseTime] = useState(shopInfo.saturdayCloseTime || '18:00');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [hoursError, setHoursError] = useState('');
 
-  // Time slots for the selected date
+  // Os horários da nuvem podem chegar depois que a aba abriu: atualiza o formulário
+  // (antes, salvar com o formulário desatualizado sobrescrevia os horários publicados)
+  useEffect(() => {
+    setOpenTime(shopInfo.openTime);
+    setCloseTime(shopInfo.closeTime);
+    setLunchStart(shopInfo.lunchStart);
+    setLunchEnd(shopInfo.lunchEnd);
+    setSlotDurationMinutes(shopInfo.slotDurationMinutes);
+    setSaturdayOpenTime(shopInfo.saturdayOpenTime || '09:00');
+    setSaturdayCloseTime(shopInfo.saturdayCloseTime || '18:00');
+  }, [shopInfo.openTime, shopInfo.closeTime, shopInfo.lunchStart, shopInfo.lunchEnd, shopInfo.slotDurationMinutes, shopInfo.saturdayOpenTime, shopInfo.saturdayCloseTime]);
+
+  const selectedWeekday = useMemo(() => {
+    const [y, m, d] = (selectedDate || '').split('-').map(Number);
+    return y ? new Date(y, m - 1, d).getDay() : null;
+  }, [selectedDate]);
+  const isSunday = selectedWeekday === 0;
+
+  // Time slots for the selected date (sábado usa o expediente de sábado)
   const slots = useMemo(() => {
+    if (isSunday) return [];
+    const isSaturday = selectedWeekday === 6;
     return generateTimeSlots(
-      shopInfo.openTime,
-      shopInfo.closeTime,
+      isSaturday ? (shopInfo.saturdayOpenTime || '09:00') : shopInfo.openTime,
+      isSaturday ? (shopInfo.saturdayCloseTime || '18:00') : shopInfo.closeTime,
       shopInfo.slotDurationMinutes,
       shopInfo.lunchStart,
       shopInfo.lunchEnd
     );
-  }, [shopInfo]);
+  }, [shopInfo, selectedWeekday, isSunday]);
 
   // Handle saving general shop schedule
   const handleSaveShopHours = (e) => {
     e.preventDefault();
+    const min = (t) => timeToMinutes(t);
+    if (!openTime || !closeTime || min(openTime) >= min(closeTime)
+      || !saturdayOpenTime || !saturdayCloseTime || min(saturdayOpenTime) >= min(saturdayCloseTime)) {
+      setHoursError('O horário de abertura precisa ser antes do fechamento.');
+      return;
+    }
+    if (lunchStart && lunchEnd && min(lunchStart) >= min(lunchEnd)) {
+      setHoursError('O início do almoço precisa ser antes do fim do almoço.');
+      return;
+    }
+    setHoursError('');
     setShopInfo(prev => ({
       ...prev,
       openTime,
       closeTime,
+      saturdayOpenTime,
+      saturdayCloseTime,
       lunchStart,
       lunchEnd,
-      slotDurationMinutes: Number(slotDurationMinutes)
+      slotDurationMinutes: Number(slotDurationMinutes) || 30
     }));
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
@@ -123,6 +159,11 @@ export default function ScheduleTab() {
             </div>
           </div>
 
+          {isSunday && (
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 text-center">
+              Domingo a barbearia não abre para agendamentos online.
+            </div>
+          )}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2">
             {slots.map(time => {
               const isBlocked = blockedSlots.some(b => b.date === selectedDate && b.time === time && b.barberId === selectedBarberId);
@@ -148,7 +189,9 @@ export default function ScheduleTab() {
                       ? 'Horário bloqueado manualmente'
                       : occupyingApt
                       ? `Agendado: ${occupyingApt.clientName} (${occupyingApt.serviceName} • ${occupyingApt.duration || 30} min)`
-                      : 'Disponível para agendamento'
+                      : available
+                      ? 'Disponível para agendamento'
+                      : 'Indisponível (reservado por cliente, almoço ou fim do expediente)'
                   }
                   className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                     isBlocked
@@ -163,7 +206,7 @@ export default function ScheduleTab() {
                     <span>{time}</span>
                   </div>
                   <span className="text-[9px] font-normal">
-                    {isBlocked ? 'Bloqueado' : available ? 'Disponível' : 'Agendado'}
+                    {isBlocked ? 'Bloqueado' : available ? 'Disponível' : occupyingApt ? 'Agendado' : 'Indisponível'}
                   </span>
                 </button>
               );
@@ -233,6 +276,33 @@ export default function ScheduleTab() {
             />
           </div>
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div>
+            <label className="text-slate-300 font-semibold block mb-1">Abertura no Sábado</label>
+            <input
+              type="time"
+              value={saturdayOpenTime}
+              onChange={e => setSaturdayOpenTime(e.target.value)}
+              className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+          <div>
+            <label className="text-slate-300 font-semibold block mb-1">Fechamento no Sábado</label>
+            <input
+              type="time"
+              value={saturdayCloseTime}
+              onChange={e => setSaturdayCloseTime(e.target.value)}
+              className="w-full bg-slate-900 border border-white/15 px-3 py-2 rounded-xl text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+        </div>
+
+        {hoursError && (
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            {hoursError}
+          </div>
+        )}
 
         <div className="pt-2 flex justify-end">
           <button
