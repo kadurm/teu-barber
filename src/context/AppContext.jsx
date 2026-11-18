@@ -21,7 +21,8 @@ import {
   splitBarberData,
   PRIVATE_BARBER_FIELDS,
   getSlotId,
-  isCollectionEmptyOnServer
+  isCollectionEmptyOnServer,
+  reserveSlotDoc
 } from '../services/firebase';
 import { toLocalISODate } from '../utils/formatters';
 
@@ -428,36 +429,42 @@ export function AppProvider({ children }) {
     return clean;
   };
 
-  const saveClientProfile = (phone, name, notes = '') => {
+  // Lista de clientes mais recente (o cadastro é calculado fora do setState: o updater do React
+  // pode rodar depois, e antes disso o cadastro saía "null" e nunca era gravado na nuvem)
+  const clientsRef = useRef(clients);
+  clientsRef.current = clients;
+
+  const CLIENT_CLOUD_FIELDS = ['phone', 'name', 'notes', 'createdAt', 'updatedAt', 'totalBookings'];
+
+  const saveClientProfile = (phone, name, notes = '', { countBooking = false } = {}) => {
     const cleanPhone = normalizePhone(phone);
     if (!cleanPhone) return null;
 
-    let updatedClient = null;
-    setClients(prev => {
-      const existingIdx = prev.findIndex(c => normalizePhone(c.phone) === cleanPhone);
-      if (existingIdx >= 0) {
-        const existing = prev[existingIdx];
-        updatedClient = {
+    const now = new Date().toISOString();
+    const existing = clientsRef.current.find(c => normalizePhone(c.phone) === cleanPhone);
+    const updatedClient = existing
+      ? {
           ...existing,
           phone: cleanPhone,
-          name: name.trim() || existing.name,
-          notes: notes !== undefined ? notes.trim() : existing.notes,
-          updatedAt: new Date().toISOString()
-        };
-        const next = [...prev];
-        next[existingIdx] = updatedClient;
-        return next;
-      } else {
-        updatedClient = {
+          name: (name || '').trim() || existing.name,
+          notes: notes !== undefined && notes !== null ? String(notes).trim() : (existing.notes || ''),
+          updatedAt: now,
+          totalBookings: (existing.totalBookings || 0) + (countBooking ? 1 : 0)
+        }
+      : {
           phone: cleanPhone,
-          name: name.trim(),
-          notes: notes ? notes.trim() : '',
-          createdAt: new Date().toISOString(),
+          name: (name || '').trim(),
+          notes: notes ? String(notes).trim() : '',
+          createdAt: now,
+          updatedAt: now,
           totalBookings: 1
         };
-        return [updatedClient, ...prev];
-      }
-    });
+
+    const nextClients = existing
+      ? clientsRef.current.map(c => normalizePhone(c.phone) === cleanPhone ? updatedClient : c)
+      : [updatedClient, ...clientsRef.current];
+    clientsRef.current = nextClients;
+    setClients(nextClients);
 
     try {
       localStorage.setItem(`teu_barber_client_${cleanPhone}`, JSON.stringify(updatedClient));
@@ -465,8 +472,12 @@ export function AppProvider({ children }) {
       // ignore
     }
 
-    if (isFirebaseConfigured() && updatedClient) {
-      saveFirestoreDoc('clients', cleanPhone, updatedClient);
+    if (isFirebaseConfigured() && updatedClient.name) {
+      // Só os campos aceitos pelas regras do Firestore em /clients
+      const cloudData = Object.fromEntries(
+        CLIENT_CLOUD_FIELDS.filter(f => updatedClient[f] !== undefined).map(f => [f, updatedClient[f]])
+      );
+      saveFirestoreDoc('clients', cleanPhone, cloudData);
     }
 
     setCurrentClientPhone(cleanPhone);
@@ -591,7 +602,22 @@ export function AppProvider({ children }) {
   }, [shopInfo, isAdmin]);
 
   // Appointment Actions
-  const addAppointment = (data) => {
+  // Reserva o horário na nuvem ANTES de confirmar o agendamento do cliente.
+  // O documento /slots tem ID fixo (profissional + data + hora) e o público só pode criá-lo:
+  // se outro cliente reservou o mesmo horário segundos antes, a gravação é negada.
+  // Retorna 'ok', 'taken' ou 'unknown' (sem nuvem, sem resposta a tempo ou outro erro).
+  const reserveSlot = async ({ barberId, date, time, duration }) => {
+    if (!isFirebaseConfigured() || !barberId || !date || !time) return 'unknown';
+    return reserveSlotDoc(getSlotId(barberId, date, time), {
+      barberId,
+      date,
+      time,
+      duration: Number(duration || shopInfo?.slotDurationMinutes || 30),
+      createdAt: new Date().toISOString()
+    });
+  };
+
+  const addAppointment = (data, { slotReserved = false } = {}) => {
     const id = generateAppointmentId();
     const newApt = {
       id,
@@ -607,7 +633,7 @@ export function AppProvider({ children }) {
     if (isFirebaseConfigured()) {
       saveFirestoreDoc('appointments', newApt.id, newApt);
       // Publica só a ocupação do horário (sem nome/telefone) para os outros clientes
-      if (newApt.barberId && newApt.date && newApt.time) {
+      if (!slotReserved && newApt.barberId && newApt.date && newApt.time) {
         saveFirestoreDoc('slots', getSlotId(newApt.barberId, newApt.date, newApt.time), {
           barberId: newApt.barberId,
           date: newApt.date,
@@ -619,14 +645,9 @@ export function AppProvider({ children }) {
     }
 
     // Salva ou atualiza automaticamente o usuário usando o número de WhatsApp como chave
+    // (cliente novo nasce com totalBookings = 1; quem já existia soma +1)
     if (data.clientPhone && data.clientName) {
-      const clean = normalizePhone(data.clientPhone);
-      const existed = clients.some(c => normalizePhone(c.phone) === clean);
-      saveClientProfile(data.clientPhone, data.clientName, data.notes || '');
-      // Cliente novo já nasce com totalBookings = 1; só soma para quem já existia
-      if (existed) {
-        setClients(prev => prev.map(c => normalizePhone(c.phone) === clean ? { ...c, totalBookings: (c.totalBookings || 0) + 1 } : c));
-      }
+      saveClientProfile(data.clientPhone, data.clientName, data.notes || '', { countBooking: true });
     }
 
     return newApt;
@@ -1040,6 +1061,7 @@ export function AppProvider({ children }) {
       reminder2hNotification,
       setReminder2hNotification,
       addAppointment,
+      reserveSlot,
       updateAppointmentStatus,
       deleteAppointment,
       addFinancialRecord,
