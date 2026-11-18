@@ -320,11 +320,25 @@ export function AppProvider({ children }) {
       }
     });
 
+    // 5. Metas de melhoria do espaço. Nuvem vazia + metas salvas neste navegador: publica as metas locais.
+    let acquisitionsSeeded = false;
+    const unsubAcquisitions = subscribeToCollection('acquisitions', (cloudAcq) => {
+      if (!Array.isArray(cloudAcq)) return;
+      if (cloudAcq.length === 0 && !acquisitionsSeeded && acquisitionsRef.current.length > 0) {
+        acquisitionsSeeded = true;
+        acquisitionsRef.current.forEach(goal => goal.id && saveFirestoreDoc('acquisitions', goal.id, goal, { merge: false }));
+        return;
+      }
+      acquisitionsSeeded = true;
+      setAcquisitions(cloudAcq);
+    });
+
     return () => {
       unsubAppointments();
       unsubClients();
       unsubBarbersPrivate();
       unsubFinancial();
+      unsubAcquisitions();
     };
   }, [isAdmin]);
 
@@ -727,55 +741,68 @@ export function AppProvider({ children }) {
   };
 
   // Acquisition Goals Actions
+  // Metas de melhoria do espaço: antes ficavam só no navegador de quem cadastrou.
+  // Agora são gravadas em /acquisitions (somente admin) e aparecem em qualquer aparelho do painel.
+  const acquisitionsRef = useRef(acquisitions);
+  acquisitionsRef.current = acquisitions;
+  const saveAcquisitionToCloud = (goal) => {
+    if (isFirebaseConfigured() && isAdminRef.current) saveFirestoreDoc('acquisitions', goal.id, goal, { merge: false });
+  };
+  const replaceAcquisition = (updated) => {
+    acquisitionsRef.current = acquisitionsRef.current.map(item => item.id === updated.id ? updated : item);
+    setAcquisitions(prev => prev.map(item => item.id === updated.id ? updated : item));
+    saveAcquisitionToCloud(updated);
+  };
+
   const addAcquisitionGoal = (goal) => {
     const id = `acq-${Date.now()}`;
     const newGoal = {
       id,
       savedAmount: 0,
       status: 'em_economia',
-      targetCost: Number(goal.targetCost),
-      ...goal
+      ...goal,
+      targetCost: Number(goal.targetCost) || 0,
+      savedAmount: Number(goal.savedAmount) || 0
     };
+    acquisitionsRef.current = [newGoal, ...acquisitionsRef.current];
     setAcquisitions(prev => [newGoal, ...prev]);
+    saveAcquisitionToCloud(newGoal);
     return newGoal;
   };
 
   const updateAcquisitionGoal = (id, updates) => {
-    setAcquisitions(prev => prev.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, ...updates };
-        if (updated.savedAmount >= updated.targetCost) {
-          updated.status = 'adquirido';
-        }
-        return updated;
-      }
-      return item;
-    }));
+    const item = acquisitionsRef.current.find(g => g.id === id);
+    if (!item) return;
+    const updated = { ...item, ...updates };
+    updated.savedAmount = Number(updated.savedAmount) || 0;
+    updated.targetCost = Number(updated.targetCost) || 0;
+    if (updated.targetCost > 0 && updated.savedAmount >= updated.targetCost) {
+      updated.status = 'adquirido';
+    } else if (updates.savedAmount !== undefined || updates.targetCost !== undefined) {
+      // Valor guardado editado para baixo da meta: volta a "em economia"
+      if (updates.status === undefined && item.status === 'adquirido') updated.status = 'em_economia';
+    }
+    replaceAcquisition(updated);
   };
 
   const contributeToAcquisition = (goalId, amount, deductFromCashFlow = false) => {
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) return;
 
-    setAcquisitions(prev => prev.map(item => {
-      if (item.id === goalId) {
-        const newSaved = item.savedAmount + numAmount;
-        const newStatus = newSaved >= item.targetCost ? 'adquirido' : 'em_economia';
-        return {
-          ...item,
-          savedAmount: newSaved,
-          status: newStatus
-        };
-      }
-      return item;
-    }));
+    const item = acquisitionsRef.current.find(g => g.id === goalId);
+    if (!item) return;
+    const newSaved = (Number(item.savedAmount) || 0) + numAmount;
+    replaceAcquisition({
+      ...item,
+      savedAmount: newSaved,
+      status: newSaved >= (Number(item.targetCost) || 0) ? 'adquirido' : 'em_economia'
+    });
 
     if (deductFromCashFlow) {
-      const targetGoal = acquisitions.find(g => g.id === goalId);
       addFinancialRecord({
         type: 'saida',
         category: 'Melhoria do Espaço',
-        description: `Aporte Meta: ${targetGoal ? targetGoal.title : 'Melhoria'}`,
+        description: `Aporte Meta: ${item.title || 'Melhoria'}`,
         amount: numAmount,
         paymentMethod: 'reserva'
       });
@@ -783,7 +810,9 @@ export function AppProvider({ children }) {
   };
 
   const deleteAcquisitionGoal = (id) => {
+    acquisitionsRef.current = acquisitionsRef.current.filter(item => item.id !== id);
     setAcquisitions(prev => prev.filter(item => item.id !== id));
+    if (isFirebaseConfigured() && isAdminRef.current) deleteFirestoreDoc('acquisitions', id);
   };
 
   // Blocked Slots Actions

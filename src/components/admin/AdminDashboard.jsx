@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { toLocalISODate } from '../../utils/formatters';
 import {
   LayoutDashboard,
   Calendar,
@@ -34,7 +35,11 @@ export default function AdminDashboard({ onBackToClient, onLogout }) {
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const pendingCount = appointments.filter(a => a.status === 'pendente' || a.status === 'confirmado').length;
+  // Selo da Agenda: só horários de hoje em diante (antes somava todos os confirmados antigos e só crescia)
+  const todayStr = toLocalISODate(new Date());
+  const pendingCount = appointments.filter(a =>
+    (a.status === 'pendente' || a.status === 'confirmado') && (a.date || '') >= todayStr
+  ).length;
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
