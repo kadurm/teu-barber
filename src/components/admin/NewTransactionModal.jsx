@@ -41,6 +41,10 @@ export default function NewTransactionModal({ isOpen, onClose }) {
       date
     });
 
+    // Próximo lançamento começa em branco
+    setDescription('');
+    setAmount('');
+    setDate(toLocalISODate(new Date()));
     onClose();
   };
 

@@ -277,37 +277,25 @@ export function AppProvider({ children }) {
     if (!isFirebaseConfigured() || !isAdmin) return;
 
     // 1. Escuta agendamentos da nuvem
+    // Para o admin a nuvem é a fonte da verdade: substitui a lista local (antes um agendamento
+    // excluído em outro aparelho continuava aparecendo aqui para sempre). O Firestore já inclui
+    // nas respostas as gravações deste aparelho que ainda estão a caminho do servidor.
     const unsubAppointments = subscribeToCollection('appointments', (cloudAppointments) => {
-      if (cloudAppointments && Array.isArray(cloudAppointments) && cloudAppointments.length > 0) {
-        setAppointments(prev => {
-          const map = new Map();
-          prev.forEach(item => { if (item.id) map.set(item.id, item); });
-          cloudAppointments.forEach(item => { if (item.id) map.set(item.id, item); });
-          return Array.from(map.values()).sort((a, b) => {
-            const dateA = `${a.date || ''} ${a.time || ''}`;
-            const dateB = `${b.date || ''} ${b.time || ''}`;
-            return dateB.localeCompare(dateA);
-          });
-        });
+      if (Array.isArray(cloudAppointments)) {
+        setAppointments([...cloudAppointments].sort((a, b) => {
+          const dateA = `${a.date || ''} ${a.time || ''}`;
+          const dateB = `${b.date || ''} ${b.time || ''}`;
+          return dateB.localeCompare(dateA);
+        }));
       }
     });
 
-    // 2. Escuta clientes da nuvem
     const unsubClients = subscribeToCollection('clients', (cloudClients) => {
-      if (cloudClients && Array.isArray(cloudClients) && cloudClients.length > 0) {
-        setClients(prev => {
-          const map = new Map();
-          prev.forEach(c => { if (c.phone) map.set(c.phone, c); });
-          cloudClients.forEach(c => {
-            const phone = c.phone || c.id;
-            if (phone) map.set(phone, { ...c, phone });
-          });
-          return Array.from(map.values());
-        });
+      if (Array.isArray(cloudClients)) {
+        setClients(cloudClients.map(c => ({ ...c, phone: c.phone || c.id })).filter(c => c.phone));
       }
     });
 
-    // 3. Dados sensíveis dos barbeiros (CPF, PIX, comissão, telefone)
     const unsubBarbersPrivate = subscribeToCollection('barbers_private', (privList) => {
       if (privList && Array.isArray(privList) && privList.length > 0) {
         setBarbers(prev => prev.map(b => {
