@@ -244,7 +244,13 @@ export function AppProvider({ children }) {
 
     const unsubServices = subscribeToCollection('services', (cloudServices) => {
       if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
-        setServices(cloudServices);
+        // A nuvem devolve em ordem alfabética de ID; mantém a ordem do catálogo da barbearia
+        // (Corte primeiro...) e coloca os serviços novos no fim, na ordem em que foram criados
+        const rank = (srv) => {
+          const i = SERVICES.findIndex(d => d.id === srv.id);
+          return i >= 0 ? i : SERVICES.length;
+        };
+        setServices([...cloudServices].sort((a, b) => (rank(a) - rank(b)) || String(a.id).localeCompare(String(b.id))));
       }
     });
 
@@ -850,7 +856,7 @@ export function AppProvider({ children }) {
       bio: barberData.bio || '',
       rating: '5.0',
       totalReviews: 0,
-      active: true,
+      active: barberData.active !== false, // respeita "Parceiro ativo" desmarcado no cadastro
       admissionDate: barberData.admissionDate || toLocalISODate(new Date())
     };
     setBarbers(prev => [...prev, newBarber]);

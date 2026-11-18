@@ -35,11 +35,12 @@ export default function PartnersTab() {
       return { start: todayStr, end: todayStr, label: 'Hoje' };
     }
     if (selectedPeriod === 'week') {
-      const d = new Date(now);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const monday = toLocalISODate(new Date(d.setDate(diff)));
-      const sunday = toLocalISODate(new Date(d.setDate(diff + 6)));
+      // Segunda a domingo da semana atual (antes o domingo saía errado na virada do mês)
+      const day = now.getDay();
+      const mondayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day === 0 ? 6 : day - 1));
+      const sundayDate = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + 6);
+      const monday = toLocalISODate(mondayDate);
+      const sunday = toLocalISODate(sundayDate);
       return { start: monday, end: sunday, label: 'Esta Semana' };
     }
     if (selectedPeriod === 'month') {
@@ -62,7 +63,8 @@ export default function PartnersTab() {
   // Filter valid appointments in period
   const filteredAppointments = useMemo(() => {
     return appointments.filter(apt => {
-      if (apt.status === 'cancelled') return false;
+      // Status são gravados em português: cancelado não entra na produção nem na comissão
+      if (apt.status === 'cancelado') return false;
       const aptDate = apt.date;
       return aptDate >= periodDates.start && aptDate <= periodDates.end;
     });
@@ -656,13 +658,13 @@ export default function PartnersTab() {
                           </td>
                           <td className="px-6 py-3.5 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              apt.status === 'completed'
+                              apt.status === 'concluido'
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : apt.status === 'confirmed'
+                                : apt.status === 'confirmado'
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : 'bg-zinc-800 text-zinc-400'
                             }`}>
-                              {apt.status === 'completed' ? 'Finalizado' : apt.status === 'confirmed' ? 'Confirmado' : apt.status}
+                              {apt.status === 'concluido' ? 'Finalizado' : apt.status === 'confirmado' ? 'Confirmado' : apt.status === 'pendente' ? 'Pendente' : apt.status}
                             </span>
                           </td>
                         </tr>
